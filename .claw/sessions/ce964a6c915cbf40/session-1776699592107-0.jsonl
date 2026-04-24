@@ -1,0 +1,3 @@
+{"created_at_ms":1776699592106,"model":"openai/Qwopus3.5-9B-v3","session_id":"session-1776699592107-0","type":"session_meta","updated_at_ms":1776699596393,"version":1,"workspace_root":"/Users/myagent/dockers/comfyui-api"}
+{"message":{"blocks":[{"text":"promphello","type":"text"}],"role":"user"},"type":"message"}
+{"message":{"blocks":[{"text":"\n\nHello! I see you might have sent an incomplete message. 😊\n\nI'm ready to help you with your software engineering tasks, coding, debugging, or any other development work. What would you like to work on today?","type":"text"}],"role":"assistant","usage":{"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"input_tokens":5384,"output_tokens":154}},"type":"message"}

@@ -1,0 +1,268 @@
+{
+  "last_node_id": 100,
+  "last_link_id": 180,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LoadImage",
+      "pos": [50, 50],
+      "size": [350, 350],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [1], "slot_index": 0}
+      ],
+      "properties": {"Node name": "LoadImage"},
+      "widgets_values": ["keyframe_1.png", "image"]
+    },
+    {
+      "id": 2,
+      "type": "LoadImage",
+      "pos": [50, 450],
+      "size": [350, 350],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [2], "slot_index": 0}
+      ],
+      "properties": {"Node name": "LoadImage"},
+      "widgets_values": ["keyframe_2.png", "image"]
+    },
+    {
+      "id": 3,
+      "type": "LoadImage",
+      "pos": [50, 850],
+      "size": [350, 350],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [3], "slot_index": 0}
+      ],
+      "properties": {"Node name": "LoadImage"},
+      "widgets_values": ["keyframe_3.png", "image"]
+    },
+    {
+      "id": 4,
+      "type": "ImageBatch",
+      "pos": [450, 250],
+      "size": [210, 46],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {"name": "image1", "type": "IMAGE", "link": 1},
+        {"name": "image2", "type": "IMAGE", "link": 2}
+      ],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [4], "slot_index": 0}
+      ],
+      "properties": {"Node name": "ImageBatch"}
+    },
+    {
+      "id": 5,
+      "type": "ImageBatch",
+      "pos": [450, 650],
+      "size": [210, 46],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {"name": "image1", "type": "IMAGE", "link": 4},
+        {"name": "image2", "type": "IMAGE", "link": 3}
+      ],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [10], "slot_index": 0}
+      ],
+      "properties": {"Node name": "ImageBatch"}
+    },
+    {
+      "id": 6,
+      "type": "CheckpointLoaderSimple",
+      "pos": [50, 1250],
+      "size": [350, 98],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {"name": "MODEL", "type": "MODEL", "links": [20], "slot_index": 0},
+        {"name": "CLIP", "type": "CLIP", "links": [21, 22], "slot_index": 1},
+        {"name": "VAE", "type": "VAE", "links": [25], "slot_index": 2}
+      ],
+      "properties": {"Node name": "CheckpointLoaderSimple"},
+      "widgets_values": ["AI-ModelScope/stable-diffusion-xl-base-1___0"]
+    },
+    {
+      "id": 7,
+      "type": "CLIPTextEncode",
+      "pos": [450, 1200],
+      "size": [500, 180],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 21}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [30], "slot_index": 0}],
+      "properties": {"Node name": "CLIPTextEncode"},
+      "widgets_values": ["cinematic masterpiece, professional studio lighting, 35mm film, highly detailed, photorealistic, natural skin texture, warm color grading, movie quality, 8K, ARRI Alexa, smooth transitions"]
+    },
+    {
+      "id": 8,
+      "type": "CLIPTextEncode",
+      "pos": [450, 1420],
+      "size": [500, 180],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 22}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [31], "slot_index": 0}],
+      "properties": {"Node name": "CLIPTextEncode"},
+      "widgets_values": ["blurry, noisy, low quality, distortion, artifact, plastic, digital look, sharp transitions, jerky motion"]
+    },
+    {
+      "id": 9,
+      "type": "HunyuanImageToVideo",
+      "pos": [1000, 250],
+      "size": [400, 300],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {"name": "positive", "type": "CONDITIONING", "link": 30},
+        {"name": "negative", "type": "CONDITIONING", "link": 31},
+        {"name": "vae", "type": "VAE", "link": 25},
+        {"name": "image", "type": "IMAGE", "link": 10}
+      ],
+      "outputs": [
+        {"name": "latent", "type": "LATENT", "links": [40], "slot_index": 0}
+      ],
+      "properties": {"Node name": "HunyuanImageToVideo"},
+      "widgets_values": [1920, 1080, 48, 6.0, 50]
+    },
+    {
+      "id": 10,
+      "type": "KSampler",
+      "pos": [1450, 250],
+      "size": [350, 300],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 20},
+        {"name": "positive", "type": "CONDITIONING", "link": 30},
+        {"name": "negative", "type": "CONDITIONING", "link": 31},
+        {"name": "latent_image", "type": "LATENT", "link": 40}
+      ],
+      "outputs": [
+        {"name": "LATENT", "type": "LATENT", "links": [50], "slot_index": 0}
+      ],
+      "properties": {"Node name": "KSampler"},
+      "widgets_values": [42, "randomize", 50, 6.0, "dpmpp_2m", "karras"]
+    },
+    {
+      "id": 11,
+      "type": "VAEDecode",
+      "pos": [1850, 250],
+      "size": [210, 46],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {"name": "samples", "type": "LATENT", "link": 50},
+        {"name": "vae", "type": "VAE", "link": 25}
+      ],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [60], "slot_index": 0}
+      ],
+      "properties": {"Node name": "VAEDecode"}
+    },
+    {
+      "id": 12,
+      "type": "SaveVideo",
+      "pos": [2100, 250],
+      "size": [500, 600],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {"name": "images", "type": "IMAGE", "link": 60},
+        {"name": "audio", "type": "AUDIO", "link": null}
+      ],
+      "outputs": [],
+      "properties": {"Node name": "SaveVideo"},
+      "widgets_values": ["ComfyUI_Keyframe_to_Video", 24, "H264", "high", 0]
+    },
+    {
+      "id": 13,
+      "type": "Note",
+      "pos": [50, 1650],
+      "size": [600, 350],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": ["🎬 关键帧/分镜生视频工作流\n\n输入：2-3 张关键帧图片\n输出：平滑过渡视频\n\n📋 使用方法：\n1. LoadImage 1: 上传第一张关键帧（起始）\n2. LoadImage 2: 上传第二张关键帧（中间）\n3. LoadImage 3: 上传第三张关键帧（结束）\n4. 点击 Queue Prompt\n\n⚙️ 参数说明：\n- 分辨率：1920x1080\n- 帧数：48 帧（2 秒@24fps）\n- CFG: 6.0\n- Steps: 50\n- 采样器：DPM++ 2M\n\n✨ 效果：\n- 关键帧之间平滑过渡\n- AI 自动插值中间帧\n- 电影级质感\n- 自然流畅\n\n⏱️ 处理时间：\n约 5-15 分钟（取决于帧数）\n\n🎯 适合：\n- 分镜预览\n- 关键动作展示\n- 转场效果\n- 概念验证"],
+      "color": "#2a363b",
+      "bgcolor": "#3f5159"
+    },
+    {
+      "id": 14,
+      "type": "Note",
+      "pos": [1000, 600],
+      "size": [400, 180],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": ["🖼️ 关键帧建议\n\n- 2 张：简单过渡（约 2 秒）\n- 3 张：有中间状态（约 3-4 秒）\n- 更多：添加更多 LoadImage 节点\n\n图片要求：\n- 相同分辨率\n- 相同构图风格\n- 清晰主体"],
+      "color": "#3b2a2a",
+      "bgcolor": "#593f3f"
+    },
+    {
+      "id": 15,
+      "type": "Note",
+      "pos": [1500, 600],
+      "size": [350, 150],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": ["📤 输出设置\n\n格式：MP4 H264\n分辨率：1920x1080\n帧率：24fps\n码率：High"],
+      "color": "#2a3b3b",
+      "bgcolor": "#3f5959"
+    }
+  ],
+  "links": [
+    [1, 1, 0, 4, 0, "IMAGE"],
+    [2, 2, 0, 4, 1, "IMAGE"],
+    [3, 3, 0, 5, 1, "IMAGE"],
+    [4, 4, 0, 5, 0, "IMAGE"],
+    [10, 5, 0, 9, 3, "IMAGE"],
+    [20, 6, 0, 10, 0, "MODEL"],
+    [21, 6, 1, 7, 0, "CLIP"],
+    [22, 6, 1, 8, 0, "CLIP"],
+    [25, 6, 2, 9, 2, "VAE"],
+    [30, 7, 0, 9, 0, "CONDITIONING"],
+    [31, 8, 0, 9, 1, "CONDITIONING"],
+    [40, 9, 0, 10, 3, "LATENT"],
+    [50, 10, 0, 11, 0, "LATENT"],
+    [60, 11, 0, 12, 0, "IMAGE"]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {"scale": 1, "offset": [0, 0]}
+  },
+  "version": 0.4
+}

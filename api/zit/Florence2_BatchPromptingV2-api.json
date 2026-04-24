@@ -1,0 +1,147 @@
+{
+  "2": {
+    "inputs": {
+      "model": "MiaoshouAI/Florence-2-large-PromptGen-v2.0",
+      "precision": "bf16",
+      "attention": "sdpa",
+      "convert_to_safetensors": false
+    },
+    "class_type": "DownloadAndLoadFlorence2Model",
+    "_meta": {
+      "title": "DownloadAndLoadFlorence2Model"
+    }
+  },
+  "3": {
+    "inputs": {
+      "text_input": "",
+      "task": "detailed_caption",
+      "fill_mask": true,
+      "keep_model_loaded": false,
+      "max_new_tokens": 512,
+      "num_beams": 3,
+      "do_sample": true,
+      "output_mask_select": "",
+      "seed": 1,
+      "image": [
+        "63",
+        0
+      ],
+      "florence2_model": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "Florence2Run",
+    "_meta": {
+      "title": "Florence2Run"
+    }
+  },
+  "4": {
+    "inputs": {
+      "text": [
+        "3",
+        2
+      ]
+    },
+    "class_type": "ShowText|pysssss",
+    "_meta": {
+      "title": "Show Text 🐍"
+    }
+  },
+  "12": {
+    "inputs": {
+      "directory": "C:\\Users\\Smysh\\Desktop\\InputImage\\dataset",
+      "image_load_cap": 0,
+      "start_index": 0,
+      "load_always": false,
+      "sort_method": "Alphabetical (ASC)"
+    },
+    "class_type": "LoadImagesFromDir //Inspire",
+    "_meta": {
+      "title": "Load Image Batch From Dir (Inspire)"
+    }
+  },
+  "18": {
+    "inputs": {
+      "output_path": "[time(%Y-%m-%d)]",
+      "filename_prefix": "ComfyUI",
+      "filename_delimiter": "",
+      "filename_number_padding": 4,
+      "filename_number_start": "false",
+      "extension": "png",
+      "dpi": 300,
+      "quality": 100,
+      "optimize_image": "true",
+      "lossless_webp": "false",
+      "overwrite_mode": "false",
+      "show_history": "false",
+      "show_history_by_prefix": "true",
+      "embed_workflow": "true",
+      "show_previews": "true",
+      "images": [
+        "12",
+        0
+      ]
+    },
+    "class_type": "Image Save",
+    "_meta": {
+      "title": "Image Save"
+    }
+  },
+  "29": {
+    "inputs": {
+      "list_input": [
+        "4",
+        0
+      ]
+    },
+    "class_type": "ImpactListBridge",
+    "_meta": {
+      "title": "List Bridge"
+    }
+  },
+  "62": {
+    "inputs": {
+      "delimiter": "",
+      "text_list": [
+        "29",
+        0
+      ]
+    },
+    "class_type": "Text List to Text",
+    "_meta": {
+      "title": "Text List to Text"
+    }
+  },
+  "63": {
+    "inputs": {
+      "image": [
+        "12",
+        0
+      ]
+    },
+    "class_type": "ImpactImageBatchToImageList",
+    "_meta": {
+      "title": "Image Batch to Image List"
+    }
+  },
+  "67": {
+    "inputs": {
+      "filename_prefix": "prompts",
+      "output_folder": "C:\\Users\\Smysh\\Desktop\\InputImage\\dataset\\prompts",
+      "caption_file_extension": ".txt",
+      "images": [
+        "63",
+        0
+      ],
+      "caption": [
+        "62",
+        0
+      ]
+    },
+    "class_type": "SaveImageKJ",
+    "_meta": {
+      "title": "Save Image KJ"
+    }
+  }
+}

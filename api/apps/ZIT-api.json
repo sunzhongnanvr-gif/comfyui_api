@@ -1,0 +1,250 @@
+{
+  "1": {
+    "inputs": {
+      "unet_name": "z_image_turbo_bf16.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "2": {
+    "inputs": {
+      "clip_name": "qwen_3_4b.safetensors",
+      "type": "lumina2",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "3": {
+    "inputs": {
+      "vae_name": "ae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "4": {
+    "inputs": {
+      "text": "Photo of a young woman with long, straight, dark brown hair, wearing a tight, black leather dress with a corset-like design. She is standing in a modern, minimalist bedroom with white walls and a gray headboard. The woman is posing with one hand on her head and the other hand resting on her hair. She has a neutral expression and is looking directly at the camera. The lighting is soft and natural, highlighting her curves and the texture of her leather. The overall aesthetic is minimalistic and contemporary.",
+      "clip": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "5": {
+    "inputs": {
+      "text": "blurry ugly bad",
+      "clip": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "6": {
+    "inputs": {
+      "seed": 260993431762178,
+      "steps": 9,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "1",
+        0
+      ],
+      "positive": [
+        "4",
+        0
+      ],
+      "negative": [
+        "5",
+        0
+      ],
+      "latent_image": [
+        "30",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "7": {
+    "inputs": {
+      "samples": [
+        "6",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "9": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "7",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "12": {
+    "inputs": {
+      "megapixel": "2.5",
+      "aspect_ratio": "3:4 (Golden Ratio)",
+      "divisible_by": "16",
+      "custom_ratio": false,
+      "custom_aspect_ratio": "1:1"
+    },
+    "class_type": "FluxResolutionNode",
+    "_meta": {
+      "title": "Flux Resolution Calc"
+    }
+  },
+  "20": {
+    "inputs": {
+      "enable_upscale": false,
+      "upscale_model_path": "4x_foolhardy_Remacri.pth",
+      "downscale_by": 0.5,
+      "rescale_method": "lanczos",
+      "precision": "auto",
+      "batch_size": 1,
+      "enable_levels": false,
+      "exposure": 0.098,
+      "gamma": 1,
+      "brightness": 0.018,
+      "contrast": 1.205,
+      "saturation": 1,
+      "vibrance": 0,
+      "enable_color_wheels": false,
+      "lift_r": 0,
+      "lift_g": 0,
+      "lift_b": 0,
+      "gamma_r": 1,
+      "gamma_g": 1,
+      "gamma_b": 1,
+      "gain_r": 1.05,
+      "gain_g": 1,
+      "gain_b": 1,
+      "enable_temp_tint": false,
+      "temperature": 8.596,
+      "tint": -13.764,
+      "enable_sharpen": false,
+      "sharpen_strength": 1.147,
+      "sharpen_radius": 1.85,
+      "sharpen_threshold": 0.015,
+      "enable_small_glow": false,
+      "small_glow_intensity": 0.015,
+      "small_glow_radius": 0.1,
+      "small_glow_threshold": 0.25,
+      "enable_large_glow": false,
+      "large_glow_intensity": 0.25,
+      "large_glow_radius": 50,
+      "large_glow_threshold": 0.3,
+      "enable_glare": false,
+      "glare_type": "star_4",
+      "glare_intensity": 0.65,
+      "glare_length": 1.5,
+      "glare_angle": 0,
+      "glare_threshold": 0.95,
+      "glare_quality": 16,
+      "glare_ray_width": 1,
+      "enable_chromatic_aberration": false,
+      "ca_strength": 0.005,
+      "ca_edge_fallof": 2,
+      "enable_ca_hue_shift": false,
+      "ca_hue_shift_degrees": 0,
+      "enable_vignette": false,
+      "vignette_strength": 0.205,
+      "vignette_radius": 0.7,
+      "vignette_softness": 2,
+      "enable_radial_blur": false,
+      "radial_blur_type": "spin",
+      "radial_blur_strength": 0,
+      "radial_blur_center_x": 0.5,
+      "radial_blur_center_y": 0.25,
+      "radial_blur_falloff": 0.05,
+      "radial_blur_samples": 16,
+      "enable_film_grain": false,
+      "grain_intensity": 0.02,
+      "grain_size": 0.373,
+      "grain_color_amount": 0.044,
+      "enable_lens_distortion": false,
+      "barrel_distortion": 0,
+      "image": [
+        "7",
+        0
+      ]
+    },
+    "class_type": "CRT Post-Process Suite",
+    "_meta": {
+      "title": "Post-Process Suite (CRT)"
+    }
+  },
+  "21": {
+    "inputs": {
+      "image_a": [
+        "20",
+        0
+      ],
+      "image_b": [
+        "7",
+        0
+      ]
+    },
+    "class_type": "Image Comparer (rgthree)",
+    "_meta": {
+      "title": "Image Comparer (rgthree)"
+    }
+  },
+  "22": {
+    "inputs": {
+      "filename_prefix": "Wan/Upscaled/UP",
+      "images": [
+        "20",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "30": {
+    "inputs": {
+      "dimensions": "1344 x 768   (landscape)",
+      "clip_scale": 1,
+      "batch_size": 1
+    },
+    "class_type": "SDXL Empty Latent Image (rgthree)",
+    "_meta": {
+      "title": "SDXL Empty Latent Image (rgthree)"
+    }
+  }
+}

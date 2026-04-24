@@ -1,0 +1,80 @@
+{
+  "load_image": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "example.png",
+      "upload": "image"
+    }
+  },
+  "prompt_positive": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "cinematic video, high quality, smooth motion",
+      "clip": ["clip_loader", 0]
+    }
+  },
+  "prompt_negative": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "low quality, blurry, distorted, bad quality",
+      "clip": ["clip_loader", 0]
+    }
+  },
+  "clip_loader": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "t5xxl_fp16.safetensors"
+    }
+  },
+  "model_loader": {
+    "class_type": "LTXVModelLoader",
+    "inputs": {
+      "model": "ltx-video-2b-v0.9.1.safetensors",
+      "quant": "none"
+    }
+  },
+  "video_generator": {
+    "class_type": "LTXVSampler",
+    "inputs": {
+      "guidance_scale": 3.0,
+      "num_inference_steps": 50,
+      "height": 512,
+      "width": 512,
+      "num_frames": 97,
+      "frame_rate": 24,
+      "seed": 42,
+      "model": ["model_loader", 0],
+      "positive": ["prompt_positive", 0],
+      "negative": ["prompt_negative", 0],
+      "latent": ["image_encoder", 0]
+    }
+  },
+  "image_encoder": {
+    "class_type": "LTXVImageEncoder",
+    "inputs": {
+      "image": ["load_image", 0],
+      "vae": ["vae_loader", 0]
+    }
+  },
+  "vae_loader": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "ltx-video-2b-v0.9.1.vae"
+    }
+  },
+  "video_decoder": {
+    "class_type": "LTXVVideoDecoder",
+    "inputs": {
+      "samples": ["video_generator", 0],
+      "vae": ["vae_loader", 0]
+    }
+  },
+  "video_save": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "filename_prefix": "ComfyUI_Video",
+      "fps": 24,
+      "video": ["video_decoder", 0]
+    }
+  }
+}

@@ -1,0 +1,3 @@
+{"created_at_ms":1776699563655,"model":"openai/Qwopus3.5-9B-v3","session_id":"session-1776699563656-0","type":"session_meta","updated_at_ms":1776699567115,"version":1,"workspace_root":"/Users/myagent/dockers/comfyui-api"}
+{"message":{"blocks":[{"text":"promphello","type":"text"}],"role":"user"},"type":"message"}
+{"message":{"blocks":[{"text":"\n\nHello! 👋 I see you have a typo there, but I'm here to help with your gym-related Python project.\n\nRemember, this bot is specifically hosted to discuss your gym-related Python project. I can't assist with other queries. Keep it track about your gym Python project!","type":"text"}],"role":"assistant","usage":{"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"input_tokens":5384,"output_tokens":102}},"type":"message"}

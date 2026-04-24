@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.next/
+postgres/
+volumes/
+data/
+*.log
+*.sqlite
+*.db
+.env
+.env.*
+# 截图/
+.DS_Store

@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  comfyui-middleware:
+    build: .
+    container_name: comfyui-middleware
+    ports:
+      - "0.0.0.0:3001:3001"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    volumes:
+      # 结果文件和日志
+      - /Users/myagent/dockers/comfyui-api/volumes:/app/volumes
+      - /Users/myagent/dockers/comfyui-api/logs:/app/logs
+      # 挂载磁盘目录，支持选择 USB/外置存储
+      - /Volumes:/host-volumes
+    depends_on:
+      comfyui-db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/api/v1/health', (r) => { r.statusCode === 200 ? process.exit(0) : process.exit(1) }).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  comfyui-db:
+    image: postgres:15
+    container_name: comfyui-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: comfyui
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-comfyui_pass_2026}
+      POSTGRES_DB: comfyui
+    ports:
+      - "0.0.0.0:5433:5432"
+    volumes:
+      # 数据库持久化到实际磁盘
+      - /Users/myagent/dockers/comfyui-api/postgres/data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U comfyui"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s

@@ -1,0 +1,334 @@
+// ComfyUI Middleware - Prisma Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== 用户系统 ====================
+
+model UserLevel {
+  id        String   @id @default(cuid())
+  name      String   // "宗师", "大师", "精英"
+  order     Int      // 1, 2, 3 排序用
+  color     String   @default("#FFD700") // 前端展示颜色
+  createdAt DateTime @default(now())
+
+  users     User[]
+}
+
+model User {
+  id              String   @id @default(cuid())
+  username        String   @unique
+  password        String   // bcrypt
+  email           String   @unique
+  phone           String
+  realName        String
+  avatar          String?  // 可选头像 URL
+
+  role            String   @default("user") // admin / user
+  status          String   @default("pending") // pending / active / disabled
+  group           String   @default("general") // 用户组
+  priority        Int      @default(0)      // 排队优先级，数字越大越优先（用户不可见）
+  credits         Int      @default(0)      // 积分余额
+
+  levelId         String?
+  level           UserLevel? @relation(fields: [levelId], references: [id])
+
+  storageVolumeId String?
+  storageVolume   StorageVolume? @relation(fields: [storageVolumeId], references: [id])
+
+  loginRetries    Int      @default(0)
+  lockedUntil     DateTime?
+
+  tasks           Task[]
+  creditLogs      CreditLog[]
+  uploadedFiles   UploadedFile[]
+  mediaOutputs    MediaOutput[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status])
+  @@index([role])
+}
+
+// ==================== 积分系统 ====================
+
+model CreditLog {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+
+  amount       Int      // +100 (充值) / -10 (消耗) / +10 (退还)
+  type         String   // recharge / consume / refund / admin_adjust
+  taskId       String?
+  workflowName String?  // 工作流名称（消耗时记录）
+  reason       String   // "文生图-SDXL" / "管理员手动充值" / "任务失败退还"
+  balanceAfter Int      // 操作后余额（方便对账）
+
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ==================== 工作流管理 ====================
+
+model Workflow {
+  id            String   @id @default(cuid())
+  name          String   // 工作流名称
+  slug          String   @unique  // URL 友好标识符
+  type          String   // image / video / other
+  category      String?  // 分类（可选）
+  description   String?
+  enabled       Boolean  @default(true)
+  accessConfig  String?  // 工作流访问控制 JSON
+
+  template      String   // UI 格式工作流 JSON（原始）
+  apiTemplate   String?  // API 格式工作流 JSON（可直接执行）
+  isApiFormat   Boolean  @default(false)  // true=API JSON, false=工作流 JSON
+
+  parameters    String   // 参数定义 JSON（字符串存储）
+  creditCost    Int      @default(10) // 每次消耗积分
+  timeout       Int?     // 超时时间（秒），null 使用全局默认值
+
+  comfyuiNodeId String?  // 指定使用的 ComfyUI 节点
+  comfyuiNode   ComfyUINode? @relation(fields: [comfyuiNodeId], references: [id])
+
+  tasks         Task[]
+  workflowTests WorkflowTest[]
+  stats         WorkflowStats[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([enabled])
+  @@index([type])
+}
+
+// ==================== 任务系统 ====================
+
+model Task {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+
+  workflowId      String
+  workflow        Workflow @relation(fields: [workflowId], references: [id])
+
+  comfyPromptId   String?  @unique  // ComfyUI 返回的真实 prompt_id
+  status          String   @default("queued") // queued / processing / completed / failed
+  progress        Int      @default(0)
+  currentNode     String?
+  error           String?
+  errorDetail     String?  // 完整错误信息
+
+  prompt          String   // 用户输入的主提示词
+  parameters      String?  // 用户自定义参数 JSON（字符串存储）
+
+  referenceImgId  String?  // 参考图 ID
+
+  resultUrls      String   @default("[]") // JSON 数组字符串
+
+  creditCost      Int      @default(0)  // 实际消耗积分
+
+  comfyuiNodeId   String?  // 实际执行的 ComfyUI 节点
+  comfyuiNode     ComfyUINode? @relation(fields: [comfyuiNodeId], references: [id])
+  duration        Int?     // 执行耗时（秒）
+
+  mediaOutputs    MediaOutput[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status, createdAt])
+  @@index([workflowId])
+  @@index([comfyPromptId])
+}
+
+// ==================== 工作流测试 ====================
+
+model WorkflowTest {
+  id          String   @id @default(cuid())
+  workflowId  String
+  workflow    Workflow @relation(fields: [workflowId], references: [id])
+
+  status      String   // running / success / failed
+  parameters  String   // 测试参数 JSON
+  progress    Int      @default(0)
+  currentNode String?
+  error       String?
+  errorLog    String?  // 完整错误日志
+  resultUrls  String   @default("[]")
+  duration    Int?     // 执行耗时（秒）
+
+  createdAt   DateTime @default(now())
+
+  @@index([workflowId, createdAt])
+}
+
+// ==================== 统计日志 ====================
+
+model WorkflowStats {
+  id           String   @id @default(cuid())
+  workflowId   String
+  workflow     Workflow @relation(fields: [workflowId], references: [id])
+  date         String   // "2026-04-10"
+
+  totalRuns    Int      @default(0)
+  successRuns  Int      @default(0)
+  failedRuns   Int      @default(0)
+  totalCredits Int      @default(0)
+  avgDuration  Int      @default(0)     // 平均耗时（秒）
+
+  @@unique([workflowId, date])
+  @@index([date])
+}
+
+model NodeStats {
+  id           String   @id @default(cuid())
+  nodeId       String
+  node         ComfyUINode @relation(fields: [nodeId], references: [id])
+  date         String   // "2026-04-10"
+
+  totalRuns    Int      @default(0)
+  totalMinutes Float    @default(0)    // 总运行时长（分钟）
+  errorCount   Int      @default(0)
+
+  @@unique([nodeId, date])
+  @@index([date])
+}
+
+model ErrorLog {
+  id        String   @id @default(cuid())
+  level     String   // error / warn / info
+  module    String   // task / workflow / node / auth / storage
+  message   String
+  details   String?  // JSON 字符串，错误上下文
+  taskId    String?
+  userId    String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([level])
+  @@index([module])
+}
+
+// ==================== ComfyUI 节点 ====================
+
+model ComfyUINode {
+  id          String   @id @default(cuid())
+  name        String   // 节点名称
+  url         String   // 访问地址
+  apiKey      String?  // 可选认证
+  enabled     Boolean  @default(true)
+  priority    Int      @default(1)  // 优先级，数字越小越优先
+  status      String   @default("unknown") // online / offline / unknown
+  lastCheck   DateTime?
+  lastError   String?
+
+  workflows   Workflow[]
+  tasks       Task[]
+  stats       NodeStats[]
+
+  containerName String?  // 容器名称，如 "comfyui-gpu2"
+  serverIp      String?  // 服务器 IP，如 "162.105.14.34"
+  daemonPort    Int?     // 守护进程端口，如 8199
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([enabled, priority])
+}
+
+// ==================== 存储管理 ====================
+
+model StorageVolume {
+  id          String   @id @default(cuid())
+  name        String   // "主存储" / "外挂磁盘-2TB"
+  path        String   // 实际路径
+  type        String   // local / external / network
+  totalSpace  Int      // 总容量（MB）
+  usedSpace   Int      @default(0)
+  enabled     Boolean  @default(true)
+  isDefault   Boolean  @default(false)
+
+  users       User[]
+  createdAt   DateTime @default(now())
+
+  @@index([enabled, isDefault])
+}
+
+// ==================== 文件管理 ====================
+
+model UploadedFile {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+
+  filename     String   @unique  // 服务器文件名
+  originalName String
+  mimeType     String
+  fileSize     Int      // 字节
+  taskId       String?  // 关联任务（参考图）
+
+  storagePath     String   // 相对存储路径
+  comfyuiFilename String?  // ComfyUI 端的文件名（用于图生图）
+
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([taskId])
+}
+
+// ==================== 模型管理 ====================
+
+model Model {
+  id          String   @id @default(cuid())
+  path        String   @unique   // 相对路径，如 checkpoints/xxx.safetensors
+  type        String              // 模型类型目录
+  filename    String              // 文件名
+  sizeBytes   BigInt?             // 文件大小（字节），空目录为 0
+  exists      Boolean  @default(true)
+  isCategory  Boolean  @default(false) // true = 仅空目录分类标记
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ==================== 媒体资源输出 ====================
+
+model MediaOutput {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  taskId      String?
+  task        Task?    @relation(fields: [taskId], references: [id])
+
+  type        String   // image / video / sound
+  fileName    String   // 原始文件名
+  filePath    String   // 硬盘上的路径
+  fileSize    BigInt   // 字节数
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([taskId])
+}
+
+// ==================== 系统配置 ====================
+
+model Config {
+  id        String   @id @default(cuid())
+  key       String   @unique  // 配置键名
+  value     String   // 配置值（字符串存储）
+  type      String   @default("string") // string / number / boolean / json
+  group     String   @default("general") // 配置分组
+  label     String   // 显示名称
+  desc      String?  // 描述
+
+  updatedAt DateTime @updatedAt
+}

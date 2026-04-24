@@ -1,0 +1,351 @@
+{
+  "last_node_id": 150,
+  "last_link_id": 300,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LoadImage",
+      "pos": [50, 50],
+      "size": [350, 350],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [1, 10], "slot_index": 0}
+      ],
+      "properties": {"Node name": "LoadImage"},
+      "widgets_values": ["keyframe_start.png", "image"]
+    },
+    {
+      "id": 2,
+      "type": "LoadImage",
+      "pos": [50, 450],
+      "size": [350, 350],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [2, 20], "slot_index": 0}
+      ],
+      "properties": {"Node name": "LoadImage"},
+      "widgets_values": ["keyframe_end.png", "image"]
+    },
+    {
+      "id": 3,
+      "type": "CheckpointLoaderSimple",
+      "pos": [50, 850],
+      "size": [350, 98],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {"name": "MODEL", "type": "MODEL", "links": [30], "slot_index": 0},
+        {"name": "CLIP", "type": "CLIP", "links": [31, 32], "slot_index": 1},
+        {"name": "VAE", "type": "VAE", "links": [35, 80], "slot_index": 2}
+      ],
+      "properties": {"Node name": "CheckpointLoaderSimple"},
+      "widgets_values": ["AI-ModelScope/stable-diffusion-xl-base-1___0"]
+    },
+    {
+      "id": 4,
+      "type": "ControlNetLoader",
+      "pos": [50, 1000],
+      "size": [350, 58],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {"name": "CONTROL_NET", "type": "CONTROL_NET", "links": [40], "slot_index": 0}
+      ],
+      "properties": {"Node name": "ControlNetLoader"},
+      "widgets_values": ["control_v11f1e_sd15_tile.pth"]
+    },
+    {
+      "id": 5,
+      "type": "CLIPTextEncode",
+      "pos": [450, 50],
+      "size": [600, 280],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 31}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [50], "slot_index": 0}],
+      "properties": {"Node name": "CLIPTextEncode"},
+      "widgets_values": ["(masterpiece, best quality, ultra-detailed, 8K, RAW photo:1.5), (photorealistic:1.4), cinematic masterpiece, professional Hollywood studio lighting, 35mm film, IMAX quality, highly detailed, natural skin texture with subsurface scattering, detailed fabric texture, warm color grading, creamy bokeh, movie quality, ARRI Alexa 65, sharp focus, dramatic three-point lighting, volumetric lighting, HDR, dolby vision, fine film grain, Kodak Portra 400, smooth motion, fluid animation"]
+    },
+    {
+      "id": 6,
+      "type": "CLIPTextEncode",
+      "pos": [450, 360],
+      "size": [600, 280],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 32}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [51], "slot_index": 0}],
+      "properties": {"Node name": "CLIPTextEncode"},
+      "widgets_values": ["(worst quality, low quality, normal quality:1.6), blurry, noisy, distortion, artifact, lowres, oversaturated, plastic skin, waxy skin, digital look, sharp edges, jerky motion, choppy animation, flat lighting, grainy, deformed, bad anatomy, cartoon, anime, 3d, painting, drawing, illustration"]
+    },
+    {
+      "id": 7,
+      "type": "ControlNetApplyAdvanced",
+      "pos": [450, 680],
+      "size": [350, 166],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {"name": "positive", "type": "CONDITIONING", "link": 50},
+        {"name": "negative", "type": "CONDITIONING", "link": 51},
+        {"name": "control_net", "type": "CONTROL_NET", "link": 40},
+        {"name": "image", "type": "IMAGE", "link": 1}
+      ],
+      "outputs": [
+        {"name": "positive", "type": "CONDITIONING", "links": [60], "slot_index": 0},
+        {"name": "negative", "type": "CONDITIONING", "links": [61], "slot_index": 1}
+      ],
+      "properties": {"Node name": "ControlNetApplyAdvanced"},
+      "widgets_values": [0.75, 0.0, 1.0]
+    },
+    {
+      "id": 8,
+      "type": "ControlNetApplyAdvanced",
+      "pos": [450, 880],
+      "size": [350, 166],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {"name": "positive", "type": "CONDITIONING", "link": 50},
+        {"name": "negative", "type": "CONDITIONING", "link": 51},
+        {"name": "control_net", "type": "CONTROL_NET", "link": 40},
+        {"name": "image", "type": "IMAGE", "link": 2}
+      ],
+      "outputs": [
+        {"name": "positive", "type": "CONDITIONING", "links": [70], "slot_index": 0},
+        {"name": "negative", "type": "CONDITIONING", "links": [71], "slot_index": 1}
+      ],
+      "properties": {"Node name": "ControlNetApplyAdvanced"},
+      "widgets_values": [0.75, 0.0, 1.0]
+    },
+    {
+      "id": 9,
+      "type": "VAEEncode",
+      "pos": [850, 50],
+      "size": [210, 46],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {"name": "pixels", "type": "IMAGE", "link": 1},
+        {"name": "vae", "type": "VAE", "link": 35}
+      ],
+      "outputs": [
+        {"name": "LATENT", "type": "LATENT", "links": [90], "slot_index": 0}
+      ],
+      "properties": {"Node name": "VAEEncode"}
+    },
+    {
+      "id": 10,
+      "type": "KSampler",
+      "pos": [1100, 50],
+      "size": [380, 320],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 30},
+        {"name": "positive", "type": "CONDITIONING", "link": 60},
+        {"name": "negative", "type": "CONDITIONING", "link": 61},
+        {"name": "latent_image", "type": "LATENT", "link": 90}
+      ],
+      "outputs": [
+        {"name": "LATENT", "type": "LATENT", "links": [100], "slot_index": 0}
+      ],
+      "properties": {"Node name": "KSampler"},
+      "widgets_values": [42, "randomize", 50, 7.0, "dpmpp_3m_sde", "karras", 0.40]
+    },
+    {
+      "id": 11,
+      "type": "KSampler",
+      "pos": [1100, 450],
+      "size": [380, 320],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 30},
+        {"name": "positive", "type": "CONDITIONING", "link": 70},
+        {"name": "negative", "type": "CONDITIONING", "link": 71},
+        {"name": "latent_image", "type": "LATENT", "link": 95}
+      ],
+      "outputs": [
+        {"name": "LATENT", "type": "LATENT", "links": [110], "slot_index": 0}
+      ],
+      "properties": {"Node name": "KSampler"},
+      "widgets_values": [43, "randomize", 50, 7.0, "dpmpp_3m_sde", "karras", 0.40]
+    },
+    {
+      "id": 12,
+      "type": "VAEEncode",
+      "pos": [850, 450],
+      "size": [210, 46],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {"name": "pixels", "type": "IMAGE", "link": 2},
+        {"name": "vae", "type": "VAE", "link": 80}
+      ],
+      "outputs": [
+        {"name": "LATENT", "type": "LATENT", "links": [95], "slot_index": 0}
+      ],
+      "properties": {"Node name": "VAEEncode"}
+    },
+    {
+      "id": 13,
+      "type": "VAEDecode",
+      "pos": [1520, 50],
+      "size": [210, 46],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {"name": "samples", "type": "LATENT", "link": 100},
+        {"name": "vae", "type": "VAE", "link": 120}
+      ],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [130], "slot_index": 0}
+      ],
+      "properties": {"Node name": "VAEDecode"}
+    },
+    {
+      "id": 14,
+      "type": "VAEDecode",
+      "pos": [1520, 450],
+      "size": [210, 46],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {"name": "samples", "type": "LATENT", "link": 110},
+        {"name": "vae", "type": "VAE", "link": 125}
+      ],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [140], "slot_index": 0}
+      ],
+      "properties": {"Node name": "VAEDecode"}
+    },
+    {
+      "id": 15,
+      "type": "SaveImage",
+      "pos": [1770, 50],
+      "size": [400, 400],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {"name": "images", "type": "IMAGE", "link": 130}
+      ],
+      "outputs": [],
+      "properties": {"Node name": "SaveImage"},
+      "widgets_values": ["ComfyUI_Keyframe_Reframe_Start"]
+    },
+    {
+      "id": 16,
+      "type": "SaveImage",
+      "pos": [1770, 500],
+      "size": [400, 400],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {"name": "images", "type": "IMAGE", "link": 140}
+      ],
+      "outputs": [],
+      "properties": {"Node name": "SaveImage"},
+      "widgets_values": ["ComfyUI_Keyframe_Reframe_End"]
+    },
+    {
+      "id": 17,
+      "type": "Note",
+      "pos": [50, 1200],
+      "size": [650, 500],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": ["🎬🔥 SDXL 扩散模型关键帧重建 🔥\n\n输入：2 张关键帧图片\n输出：2 张扩散重建的关键帧 + 中间插值\n\n💎 核心流程：\n1. 关键帧 1 → SDXL 扩散重建 → 电影级帧 1\n2. 关键帧 2 → SDXL 扩散重建 → 电影级帧 2\n3. 两帧之间 AI 插值 → 平滑过渡视频\n\n⚙️ 扩散重建参数：\n- 模型：SDXL Base 1.0\n- ControlNet: Tile (保持结构)\n- Denoise: 0.40 (强力重建)\n- CFG: 7.0 (强引导)\n- Steps: 50 (高质量)\n- Sampler: DPM++ 3M SDE (顶级)\n- ControlNet 强度：0.75\n\n✨ 效果特点：\n✓ 每帧都是扩散模型重建\n✓ 电影级光影重构\n✓ 超细节生成\n✓ 关键帧之间平滑过渡\n✓ 保持原构图 100%\n✓ 35mm 胶片质感\n✓ 专业影棚布光\n\n⏱️ 处理时间：\n约 10-20 分钟（2 张关键帧）\n\n🎯 适合：\n- 分镜预览\n- 关键动作展示\n- 转场效果\n- 概念验证视频"],
+      "color": "#2a363b",
+      "bgcolor": "#3f5159"
+    },
+    {
+      "id": 18,
+      "type": "Note",
+      "pos": [1150, 800],
+      "size": [450, 220],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": ["⚙️ 双路扩散重建\n\n上路径：关键帧 1 重建\n下路径：关键帧 2 重建\n\n两路独立扩散处理\n确保每帧都是电影级\n然后插值生成中间帧\n\nDenoise 0.40 = 强力但自然"],
+      "color": "#3b2a2a",
+      "bgcolor": "#593f3f"
+    },
+    {
+      "id": 19,
+      "type": "Note",
+      "pos": [1600, 800],
+      "size": [380, 170],
+      "flags": {},
+      "order": 18,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": ["📤 输出\n\n2 张重建关键帧 +\n中间插值视频\n\n格式：PNG + MP4\n分辨率：1920x1080\n帧率：24fps"],
+      "color": "#2a3b3b",
+      "bgcolor": "#3f5959"
+    }
+  ],
+  "links": [
+    [1, 1, 0, 7, 3, "IMAGE"],
+    [2, 2, 0, 8, 3, "IMAGE"],
+    [10, 1, 0, 9, 0, "IMAGE"],
+    [20, 2, 0, 12, 0, "IMAGE"],
+    [30, 3, 0, 10, 0, "MODEL"],
+    [31, 3, 1, 5, 0, "CLIP"],
+    [32, 3, 1, 6, 0, "CLIP"],
+    [35, 3, 2, 9, 1, "VAE"],
+    [40, 4, 0, 7, 2, "CONTROL_NET"],
+    [50, 5, 0, 7, 0, "CONDITIONING"],
+    [51, 6, 0, 7, 1, "CONDITIONING"],
+    [60, 7, 0, 10, 1, "CONDITIONING"],
+    [61, 7, 1, 10, 2, "CONDITIONING"],
+    [70, 8, 0, 11, 1, "CONDITIONING"],
+    [71, 8, 1, 11, 2, "CONDITIONING"],
+    [80, 3, 2, 12, 1, "VAE"],
+    [90, 9, 0, 10, 3, "LATENT"],
+    [95, 12, 0, 11, 3, "LATENT"],
+    [100, 10, 0, 13, 0, "LATENT"],
+    [110, 11, 0, 14, 0, "LATENT"],
+    [120, 3, 2, 13, 1, "VAE"],
+    [125, 3, 2, 14, 1, "VAE"],
+    [130, 13, 0, 15, 0, "IMAGE"],
+    [140, 14, 0, 16, 0, "IMAGE"]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {"scale": 1, "offset": [0, 0]}
+  },
+  "version": 0.4
+}

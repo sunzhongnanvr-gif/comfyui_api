@@ -1,0 +1,97 @@
+{
+  "1": {
+    "inputs": {
+      "font_file": 30,
+      "font_size": 8,
+      "border": "light",
+      "color_theme": "light",
+      "reel_1": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "LayerUtility: ImageReelComposit",
+    "_meta": {
+      "title": "LayerUtility: Image Reel Composit"
+    }
+  },
+  "2": {
+    "inputs": {
+      "image1_text": "Qwen Image 2512 Clownshark",
+      "image2_text": "upscale",
+      "image3_text": "color fix",
+      "image4_text": "result",
+      "reel_height": 1024,
+      "border": 32,
+      "image1": [
+        "4",
+        0
+      ],
+      "image2": [
+        "5",
+        0
+      ],
+      "image3": [
+        "6",
+        0
+      ],
+      "image4": [
+        "7",
+        0
+      ]
+    },
+    "class_type": "LayerUtility: ImageReel",
+    "_meta": {
+      "title": "LayerUtility: Image Reel"
+    }
+  },
+  "4": {
+    "inputs": {
+      "image": "ComfyUI_00023_.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "5": {
+    "inputs": {
+      "image": "ComfyUI_00023_.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "6": {
+    "inputs": {
+      "image": "ComfyUI_00023_.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "7": {
+    "inputs": {
+      "image": "ComfyUI_00023_.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "8": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  }
+}

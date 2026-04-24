@@ -1,0 +1,668 @@
+{
+  "84": {
+    "inputs": {
+      "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "wan",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "89": {
+    "inputs": {
+      "text": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走",
+      "clip": [
+        "84",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Negative Prompt)"
+    }
+  },
+  "90": {
+    "inputs": {
+      "vae_name": "wan_2.1_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "93": {
+    "inputs": {
+      "text": [
+        "210",
+        0
+      ],
+      "clip": [
+        "84",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Positive Prompt)"
+    }
+  },
+  "95": {
+    "inputs": {
+      "unet_name": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+      "weight_dtype": "fp8_e4m3fn_fast"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "96": {
+    "inputs": {
+      "unet_name": "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
+      "weight_dtype": "fp8_e4m3fn_fast"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "97": {
+    "inputs": {
+      "image": "d7586ef02d5a168120a3817b5c9cb75f20f5655ad1860aacb30c6d0ec771e33f.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "首帧"
+    }
+  },
+  "101": {
+    "inputs": {
+      "lora_name": "wan2.2_i2v_A14b_high_noise_lora_rank64_lightx2v_4step_1022.safetensors",
+      "strength_model": 1,
+      "model": [
+        "95",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "102": {
+    "inputs": {
+      "lora_name": "lightx2v_I2V_14B_480p_cfg_step_distill_rank128_bf16.safetensors",
+      "strength_model": 1.0000000000000002,
+      "model": [
+        "96",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "103": {
+    "inputs": {
+      "shift": 5.000000000000001,
+      "model": [
+        "111",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingSD3",
+    "_meta": {
+      "title": "ModelSamplingSD3"
+    }
+  },
+  "104": {
+    "inputs": {
+      "shift": 5,
+      "model": [
+        "112",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingSD3",
+    "_meta": {
+      "title": "ModelSamplingSD3"
+    }
+  },
+  "111": {
+    "inputs": {
+      "sage_attention": "auto",
+      "allow_compile": false,
+      "model": [
+        "102",
+        0
+      ]
+    },
+    "class_type": "PathchSageAttentionKJ",
+    "_meta": {
+      "title": "Patch Sage Attention KJ"
+    }
+  },
+  "112": {
+    "inputs": {
+      "sage_attention": "auto",
+      "allow_compile": false,
+      "model": [
+        "101",
+        0
+      ]
+    },
+    "class_type": "PathchSageAttentionKJ",
+    "_meta": {
+      "title": "Patch Sage Attention KJ"
+    }
+  },
+  "147": {
+    "inputs": {
+      "samples": [
+        "187",
+        0
+      ],
+      "vae": [
+        "90",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "169": {
+    "inputs": {
+      "audio_encoder_name": "wav2vec2-chinese-base_fp16.safetensors"
+    },
+    "class_type": "AudioEncoderLoader",
+    "_meta": {
+      "title": "AudioEncoderLoader"
+    }
+  },
+  "170": {
+    "inputs": {
+      "audio_encoder": [
+        "169",
+        0
+      ],
+      "audio": [
+        "173",
+        0
+      ]
+    },
+    "class_type": "AudioEncoderEncode",
+    "_meta": {
+      "title": "AudioEncoderEncode"
+    }
+  },
+  "171": {
+    "inputs": {
+      "name": "Wan2_1-InfiniTetalk-Single_fp16.safetensors"
+    },
+    "class_type": "ModelPatchLoader",
+    "_meta": {
+      "title": "ModelPatchLoader"
+    }
+  },
+  "173": {
+    "inputs": {
+      "frame_rate": 20,
+      "start_frame": -4,
+      "tail_silence_frames": 48,
+      "audio": [
+        "212",
+        0
+      ],
+      "end_frame": [
+        "206",
+        0
+      ]
+    },
+    "class_type": "PainterAudioCut",
+    "_meta": {
+      "title": "PainterAudioCut"
+    }
+  },
+  "186": {
+    "inputs": {
+      "add_noise": "enable",
+      "noise_seed": 647297144649775,
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "start_at_step": 0,
+      "end_at_step": 2,
+      "return_with_leftover_noise": "disable",
+      "model": [
+        "192",
+        0
+      ],
+      "positive": [
+        "192",
+        2
+      ],
+      "negative": [
+        "192",
+        3
+      ],
+      "latent_image": [
+        "192",
+        4
+      ]
+    },
+    "class_type": "KSamplerAdvanced",
+    "_meta": {
+      "title": "KSampler (Advanced)"
+    }
+  },
+  "187": {
+    "inputs": {
+      "add_noise": "enable",
+      "noise_seed": 79625977103924,
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "start_at_step": 2,
+      "end_at_step": 10000,
+      "return_with_leftover_noise": "disable",
+      "model": [
+        "192",
+        1
+      ],
+      "positive": [
+        "192",
+        2
+      ],
+      "negative": [
+        "192",
+        3
+      ],
+      "latent_image": [
+        "186",
+        0
+      ]
+    },
+    "class_type": "KSamplerAdvanced",
+    "_meta": {
+      "title": "KSampler (Advanced)"
+    }
+  },
+  "188": {
+    "inputs": {
+      "batch_index": 4,
+      "image": [
+        "147",
+        0
+      ],
+      "length": [
+        "205",
+        0
+      ]
+    },
+    "class_type": "ImageFromBatch",
+    "_meta": {
+      "title": "ImageFromBatch"
+    }
+  },
+  "189": {
+    "inputs": {
+      "method": "mkl",
+      "strength": 1,
+      "multithread": true,
+      "image_ref": [
+        "195",
+        0
+      ],
+      "image_target": [
+        "188",
+        0
+      ]
+    },
+    "class_type": "ColorMatch",
+    "_meta": {
+      "title": "Color Match"
+    }
+  },
+  "190": {
+    "inputs": {
+      "source": [
+        "173",
+        1
+      ]
+    },
+    "class_type": "PreviewAny",
+    "_meta": {
+      "title": "Preview as Text"
+    }
+  },
+  "191": {
+    "inputs": {
+      "image": "782f24b12f5978eb02b3a820f4b5ece6799c156f031b31441ad4e7302dcf1ac3.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "尾帧"
+    }
+  },
+  "192": {
+    "inputs": {
+      "video_fps": 20.000000000000004,
+      "motion_frame": 9,
+      "audio_scale": 1.0000000000000002,
+      "model_high_noise": [
+        "104",
+        0
+      ],
+      "model_low_noise": [
+        "103",
+        0
+      ],
+      "model_patch": [
+        "171",
+        0
+      ],
+      "positive": [
+        "93",
+        0
+      ],
+      "negative": [
+        "89",
+        0
+      ],
+      "vae": [
+        "90",
+        0
+      ],
+      "audio_encoder_output_1": [
+        "170",
+        0
+      ],
+      "start_image": [
+        "195",
+        0
+      ],
+      "end_image": [
+        "196",
+        0
+      ],
+      "width": [
+        "196",
+        1
+      ],
+      "height": [
+        "196",
+        2
+      ],
+      "length": [
+        "173",
+        1
+      ]
+    },
+    "class_type": "PainterAI2V",
+    "_meta": {
+      "title": "PainterAI2V"
+    }
+  },
+  "195": {
+    "inputs": {
+      "aspect_ratio": "original",
+      "proportional_width": 1,
+      "proportional_height": 1,
+      "fit": "crop",
+      "method": "lanczos",
+      "round_to_multiple": "16",
+      "scale_to_side": "longest",
+      "scale_to_length": 1280,
+      "background_color": "#000000",
+      "image": [
+        "97",
+        0
+      ]
+    },
+    "class_type": "LayerUtility: ImageScaleByAspectRatio V2",
+    "_meta": {
+      "title": "LayerUtility: ImageScaleByAspectRatio V2"
+    }
+  },
+  "196": {
+    "inputs": {
+      "upscale_method": "nearest-exact",
+      "keep_proportion": "crop",
+      "pad_color": "0, 0, 0",
+      "crop_position": "center",
+      "divisible_by": 16,
+      "device": "cpu",
+      "image": [
+        "191",
+        0
+      ],
+      "width": [
+        "195",
+        3
+      ],
+      "height": [
+        "195",
+        4
+      ]
+    },
+    "class_type": "ImageResizeKJv2",
+    "_meta": {
+      "title": "Resize Image v2"
+    }
+  },
+  "197": {
+    "inputs": {
+      "frame_rate": 20,
+      "loop_count": 0,
+      "filename_prefix": "AnimateDiff",
+      "format": "video/h264-mp4",
+      "pingpong": false,
+      "save_output": true,
+      "images": [
+        "189",
+        0
+      ],
+      "audio": [
+        "212",
+        0
+      ],
+      "pix_fmt": "yuv420p",
+      "save_metadata": true,
+      "crf": 19,
+      "trim_to_audio": false,
+      "no_preview": false
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": {
+      "title": "保存视频"
+    }
+  },
+  "198": {
+    "inputs": {
+      "direction": "down",
+      "match_image_size": true,
+      "image1": [
+        "195",
+        0
+      ],
+      "image2": [
+        "196",
+        0
+      ]
+    },
+    "class_type": "ImageConcanate",
+    "_meta": {
+      "title": "Image Concatenate"
+    }
+  },
+  "199": {
+    "inputs": {
+      "direction": "right",
+      "match_image_size": true,
+      "image1": [
+        "198",
+        0
+      ],
+      "image2": [
+        "189",
+        0
+      ]
+    },
+    "class_type": "ImageConcanate",
+    "_meta": {
+      "title": "Image Concatenate"
+    }
+  },
+  "200": {
+    "inputs": {
+      "frame_rate": 20,
+      "loop_count": 0,
+      "filename_prefix": "AnimateDiff",
+      "format": "video/h264-mp4",
+      "pingpong": false,
+      "save_output": true,
+      "images": [
+        "199",
+        0
+      ],
+      "audio": [
+        "212",
+        0
+      ],
+      "pix_fmt": "yuv420p",
+      "save_metadata": true,
+      "crf": 19,
+      "trim_to_audio": false,
+      "no_preview": false
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": {
+      "title": "Video Combine 🎥🅥🅗🅢"
+    }
+  },
+  "204": {
+    "inputs": {
+      "image": [
+        "147",
+        0
+      ]
+    },
+    "class_type": "GetImageSizeAndCount",
+    "_meta": {
+      "title": "Get Image Size & Count"
+    }
+  },
+  "205": {
+    "inputs": {
+      "expression": "a-10",
+      "a": [
+        "204",
+        3
+      ]
+    },
+    "class_type": "MathExpression|pysssss",
+    "_meta": {
+      "title": "Math Expression 🐍"
+    }
+  },
+  "206": {
+    "inputs": {
+      "value": 121
+    },
+    "class_type": "JWInteger",
+    "_meta": {
+      "title": "帧数"
+    }
+  },
+  "210": {
+    "inputs": {
+      "prompt": "女人一边说话一边捂嘴笑"
+    },
+    "class_type": "CR Prompt Text",
+    "_meta": {
+      "title": "提示词"
+    }
+  },
+  "212": {
+    "inputs": {
+      "参考文本": "",
+      "语言": "自动",
+      "自动卸载模型": false,
+      "最大生成Token数": 2048,
+      "seed": 1078400447946967,
+      "语速": 1,
+      "批量模式": false,
+      "top_p": 0.8,
+      "top_k": 50,
+      "temperature": 0.8,
+      "repetition_penalty": 1.1,
+      "启用高级采样配置": false,
+      "模型": [
+        "213",
+        0
+      ],
+      "参考音频": [
+        "214",
+        0
+      ],
+      "文本": [
+        "215",
+        0
+      ]
+    },
+    "class_type": "Qwen3TTSVoiceClone",
+    "_meta": {
+      "title": "Qwen3TTSVoiceClone"
+    }
+  },
+  "213": {
+    "inputs": {
+      "模型名称": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "运行设备": "cuda",
+      "精度": "fp16"
+    },
+    "class_type": "Qwen3TTSModelLoader",
+    "_meta": {
+      "title": "Qwen3TTSModelLoader"
+    }
+  },
+  "214": {
+    "inputs": {
+      "audio": "2d9c43175b473b661f14b14d6418bc571b0214a544ee60ee5fe7947e30fff9ce.wav"
+    },
+    "class_type": "LoadAudio",
+    "_meta": {
+      "title": "导入参考音频"
+    }
+  },
+  "215": {
+    "inputs": {
+      "value": "我是超级面爸的粉丝"
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "合成音频文本"
+    }
+  },
+  "216": {
+    "inputs": {
+      "filename_prefix": "audio/ComfyUI",
+      "quality": "320k",
+      "audio": [
+        "212",
+        0
+      ]
+    },
+    "class_type": "SaveAudioMP3",
+    "_meta": {
+      "title": "Save Audio (MP3)"
+    }
+  }
+}

@@ -1,0 +1,518 @@
+{
+  "1": {
+    "inputs": {
+      "unet_name": "z_image_turbo_bf16.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "2": {
+    "inputs": {
+      "clip_name": "qwen_3_4b.safetensors",
+      "type": "lumina2",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "3": {
+    "inputs": {
+      "vae_name": "ae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "4": {
+    "inputs": {
+      "text": "subject/scene:\na stunning brunette woman with naturally dark brown hair, parted cleanly down the middle and pulled back into a sleek low ponytail, clear fair skin with a soft luminous glow, refined nude makeup with soft matte nude lipstick, subtle eyeliner with delicate cat-eye effect, lightly contoured cheeks, natural blush, soft naturally shaped slightly fluffy eyebrows, bright expressive eyes, refined symmetrical feminine face, elegant and confident aura, ultra detailed realistic skin texture, standing near a large window with soft natural daylight, minimalistic warm-toned interior background, blurred depth of field, cozy modern aesthetic, atmospheric lighting, high-resolution, lifestyle fashion photography\n\nstyle:\na casual, random everyday moment, shot from an awkward and slightly unflattering angle, a bit of perspective distortion, the camera tilted a little, uneven lighting with harsh shadows, mildly blurry edges, a cluttered background, the subject caught mid-movement with a natural, unposed expression, small imperfections like slightly off colors, uneven exposure, soft focus in some spots, nothing stylized, nothing polished, just a simple, spontaneous amateur snapshot that looks accidental rather than planned.",
+      "clip": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "5": {
+    "inputs": {
+      "text": "perfect symmetry, perfectly aligned face, flawless lighting, studio lighting, ideal exposure, balanced highlights, clean background, professional retouching, perfect skin texture, airbrushed look, cinematic look, polished beauty shot, editorial quality, glamour style, controlled shadows, controlled reflections, sharp precision focus, ultra-clean edges, perfect color balance, perfectly centered framing, textbook composition, photo-studio appearance, artificially smooth details, aesthetic perfection, commercial beauty standards, overly refined rendering",
+      "clip": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "6": {
+    "inputs": {
+      "seed": 365725974054602,
+      "steps": 9,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "29",
+        0
+      ],
+      "positive": [
+        "4",
+        0
+      ],
+      "negative": [
+        "5",
+        0
+      ],
+      "latent_image": [
+        "11",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "7": {
+    "inputs": {
+      "samples": [
+        "6",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "11": {
+    "inputs": {
+      "width": 1536,
+      "height": 2048,
+      "batch_size": 1
+    },
+    "class_type": "EmptyFlux2LatentImage",
+    "_meta": {
+      "title": "Empty Flux 2 Latent"
+    }
+  },
+  "12": {
+    "inputs": {
+      "megapixel": "2.5",
+      "aspect_ratio": "3:4 (Golden Ratio)",
+      "divisible_by": "16",
+      "custom_ratio": false,
+      "custom_aspect_ratio": "1:1"
+    },
+    "class_type": "FluxResolutionNode",
+    "_meta": {
+      "title": "Flux Resolution Calc"
+    }
+  },
+  "20": {
+    "inputs": {
+      "enable_upscale": true,
+      "upscale_model_path": null,
+      "downscale_by": 1,
+      "rescale_method": "lanczos",
+      "precision": "auto",
+      "batch_size": 1,
+      "enable_levels": false,
+      "exposure": 0.098,
+      "gamma": 1,
+      "brightness": 0.018,
+      "contrast": 1.205,
+      "saturation": 1,
+      "vibrance": 0,
+      "enable_color_wheels": false,
+      "lift_r": 0,
+      "lift_g": 0,
+      "lift_b": 0,
+      "gamma_r": 1,
+      "gamma_g": 1,
+      "gamma_b": 1,
+      "gain_r": 1.05,
+      "gain_g": 1,
+      "gain_b": 1,
+      "enable_temp_tint": false,
+      "temperature": 8.596,
+      "tint": -13.764,
+      "enable_sharpen": false,
+      "sharpen_strength": 1.147,
+      "sharpen_radius": 1.85,
+      "sharpen_threshold": 0.015,
+      "enable_small_glow": false,
+      "small_glow_intensity": 0.015,
+      "small_glow_radius": 0.1,
+      "small_glow_threshold": 0.25,
+      "enable_large_glow": false,
+      "large_glow_intensity": 0.25,
+      "large_glow_radius": 50,
+      "large_glow_threshold": 0.3,
+      "enable_glare": false,
+      "glare_type": "star_4",
+      "glare_intensity": 0.65,
+      "glare_length": 1.5,
+      "glare_angle": 0,
+      "glare_threshold": 0.95,
+      "glare_quality": 16,
+      "glare_ray_width": 1,
+      "enable_chromatic_aberration": false,
+      "ca_strength": 0.005,
+      "ca_edge_fallof": 2,
+      "enable_ca_hue_shift": false,
+      "ca_hue_shift_degrees": 0,
+      "enable_vignette": false,
+      "vignette_strength": 0.205,
+      "vignette_radius": 0.7,
+      "vignette_softness": 2,
+      "enable_radial_blur": false,
+      "radial_blur_type": "spin",
+      "radial_blur_strength": 0,
+      "radial_blur_center_x": 0.5,
+      "radial_blur_center_y": 0.25,
+      "radial_blur_falloff": 0.05,
+      "radial_blur_samples": 16,
+      "enable_film_grain": false,
+      "grain_intensity": 0.02,
+      "grain_size": 0.373,
+      "grain_color_amount": 0.044,
+      "enable_lens_distortion": false,
+      "barrel_distortion": 0,
+      "image": [
+        "30",
+        0
+      ]
+    },
+    "class_type": "CRT Post-Process Suite",
+    "_meta": {
+      "title": "Post-Process Suite (CRT)"
+    }
+  },
+  "21": {
+    "inputs": {
+      "image_a": [
+        "20",
+        0
+      ],
+      "image_b": [
+        "30",
+        0
+      ]
+    },
+    "class_type": "Image Comparer (rgthree)",
+    "_meta": {
+      "title": "Image Comparer (rgthree)"
+    }
+  },
+  "22": {
+    "inputs": {
+      "filename_prefix": "Wan/Upscaled/UP",
+      "images": [
+        "20",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "29": {
+    "inputs": {
+      "sage_attention": "auto",
+      "allow_compile": false,
+      "model": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "PathchSageAttentionKJ",
+    "_meta": {
+      "title": "Patch Sage Attention KJ"
+    }
+  },
+  "30": {
+    "inputs": {
+      "guide_size": 1024,
+      "guide_size_for": false,
+      "max_size": 1024,
+      "seed": 476216642066711,
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "dpmpp_2m",
+      "scheduler": "simple",
+      "denoise": 0.45,
+      "feather": 5,
+      "noise_mask": true,
+      "force_inpaint": true,
+      "bbox_threshold": 0.5,
+      "bbox_dilation": 10,
+      "bbox_crop_factor": 3,
+      "sam_detection_hint": "center-1",
+      "sam_dilation": 0,
+      "sam_threshold": 0.93,
+      "sam_bbox_expansion": 0,
+      "sam_mask_hint_threshold": 0.7,
+      "sam_mask_hint_use_negative": "False",
+      "drop_size": 10,
+      "wildcard": "",
+      "cycle": 1,
+      "inpaint_model": false,
+      "noise_mask_feather": 20,
+      "tiled_encode": false,
+      "tiled_decode": false,
+      "image": [
+        "41",
+        0
+      ],
+      "model": [
+        "29",
+        0
+      ],
+      "clip": [
+        "2",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ],
+      "positive": [
+        "4",
+        0
+      ],
+      "negative": [
+        "5",
+        0
+      ],
+      "bbox_detector": [
+        "32",
+        0
+      ],
+      "sam_model_opt": [
+        "33",
+        0
+      ]
+    },
+    "class_type": "FaceDetailer",
+    "_meta": {
+      "title": "FaceDetailer"
+    }
+  },
+  "31": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "30",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "32": {
+    "inputs": {
+      "model_name": "bbox/face_yolov8m.pt"
+    },
+    "class_type": "UltralyticsDetectorProvider",
+    "_meta": {
+      "title": "UltralyticsDetectorProvider"
+    }
+  },
+  "33": {
+    "inputs": {
+      "model_name": "sam_vit_b_01ec64.pth",
+      "device_mode": "Prefer GPU"
+    },
+    "class_type": "SAMLoader",
+    "_meta": {
+      "title": "SAMLoader (Impact)"
+    }
+  },
+  "34": {
+    "inputs": {
+      "image_a": [
+        "7",
+        0
+      ],
+      "image_b": [
+        "30",
+        0
+      ]
+    },
+    "class_type": "Image Comparer (rgthree)",
+    "_meta": {
+      "title": "Image Comparer (rgthree)"
+    }
+  },
+  "35": {
+    "inputs": {
+      "upscale_method": "nearest-exact",
+      "scale_by": 0.25,
+      "image": [
+        "7",
+        0
+      ]
+    },
+    "class_type": "ImageScaleBy",
+    "_meta": {
+      "title": "Upscale Image By"
+    }
+  },
+  "36": {
+    "inputs": {
+      "images": [
+        "7",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "38": {
+    "inputs": {
+      "upscale_model": "4x_foolhardy_Remacri.pth",
+      "mode": "rescale",
+      "rescale_factor": 1.5,
+      "resize_width": 1024,
+      "resampling_method": "bilinear",
+      "supersample": "false",
+      "rounding_modulus": 8,
+      "image": [
+        "7",
+        0
+      ]
+    },
+    "class_type": "CR Upscale Image",
+    "_meta": {
+      "title": "🔍 CR Upscale Image"
+    }
+  },
+  "39": {
+    "inputs": {
+      "pixels": [
+        "38",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "VAE Encode"
+    }
+  },
+  "40": {
+    "inputs": {
+      "seed": 644916250682628,
+      "steps": 4,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 0.41,
+      "model": [
+        "29",
+        0
+      ],
+      "positive": [
+        "4",
+        0
+      ],
+      "negative": [
+        "5",
+        0
+      ],
+      "latent_image": [
+        "39",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "41": {
+    "inputs": {
+      "samples": [
+        "40",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "42": {
+    "inputs": {
+      "image_a": [
+        "38",
+        0
+      ],
+      "image_b": [
+        "7",
+        0
+      ]
+    },
+    "class_type": "Image Comparer (rgthree)",
+    "_meta": {
+      "title": "Image Comparer (rgthree)"
+    }
+  },
+  "44": {
+    "inputs": {
+      "image_a": [
+        "20",
+        0
+      ],
+      "image_b": [
+        "7",
+        0
+      ]
+    },
+    "class_type": "Image Comparer (rgthree)",
+    "_meta": {
+      "title": "Image Comparer (rgthree)"
+    }
+  },
+  "45": {
+    "inputs": {
+      "images": [
+        "30",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "7": {
+    "inputs": {
+      "image_path_or_URL": "",
+      "image": "000031.jpg",
+      "upscale_method": "lanczos",
+      "megapixels": 0,
+      "scale_by": 1,
+      "resize_mode": "longest_side",
+      "size": 0
+    },
+    "class_type": "AILab_LoadImage",
+    "_meta": {
+      "title": "Load Image (RMBG) 🖼️"
+    }
+  },
+  "12": {
+    "inputs": {
+      "source": [
+        "14",
+        0
+      ]
+    },
+    "class_type": "PreviewAny",
+    "_meta": {
+      "title": "Preview as Text"
+    }
+  },
+  "14": {
+    "inputs": {
+      "model_name": "Huihui Qwen3 VL 8B Instruct Abliterated",
+      "quantization": "8-bit (Balanced)",
+      "attention_mode": "auto",
+      "preset_prompt": "🖼️ Detailed Description",
+      "custom_prompt": "",
+      "max_tokens": 512,
+      "keep_model_loaded": 289564980581148,
+      "seed": 1341409701,
+      "image": [
+        "7",
+        0
+      ]
+    },
+    "class_type": "AILab_QwenVL",
+    "_meta": {
+      "title": "QwenVL"
+    }
+  }
+}

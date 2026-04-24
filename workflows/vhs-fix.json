@@ -1,0 +1,342 @@
+{
+  "last_node_id": 24,
+  "last_link_id": 33,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "VHS_LoadVideoFrames",
+      "pos": [20, 260],
+      "size": [320, 140],
+      "widgets_values": [
+        "input_frames",
+        0,
+        100000,
+        1
+      ],
+      "outputs": [
+        { "name": "IMAGE", "type": "IMAGE", "links": [1] },
+        { "name": "FRAME_COUNT", "type": "INT", "links": [] }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "UpscaleModelLoader",
+      "pos": [360, 80],
+      "size": [260, 60],
+      "widgets_values": [
+        "scunet_color_real_psnr.pth"
+      ],
+      "outputs": [
+        { "name": "UPSCALE_MODEL", "type": "UPSCALE_MODEL", "links": [2] }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "ImageUpscaleWithModel",
+      "pos": [660, 220],
+      "size": [300, 100],
+      "inputs": [
+        { "name": "image", "type": "IMAGE", "link": 1 },
+        { "name": "upscale_model", "type": "UPSCALE_MODEL", "link": 2 }
+      ],
+      "outputs": [
+        { "name": "IMAGE", "type": "IMAGE", "links": [3] }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "UpscaleModelLoader",
+      "pos": [360, 170],
+      "size": [260, 60],
+      "widgets_values": [
+        "RealESRGAN_x2plus.pth"
+      ],
+      "outputs": [
+        { "name": "UPSCALE_MODEL", "type": "UPSCALE_MODEL", "links": [4] }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "ImageUpscaleWithModel",
+      "pos": [990, 220],
+      "size": [300, 100],
+      "inputs": [
+        { "name": "image", "type": "IMAGE", "link": 3 },
+        { "name": "upscale_model", "type": "UPSCALE_MODEL", "link": 4 }
+      ],
+      "outputs": [
+        { "name": "IMAGE", "type": "IMAGE", "links": [5, 24] }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "CheckpointLoaderSimple",
+      "pos": [1320, 40],
+      "size": [320, 100],
+      "widgets_values": [
+        "juggernautXL_v9.safetensors"
+      ],
+      "outputs": [
+        { "name": "MODEL", "type": "MODEL", "links": [6] },
+        { "name": "CLIP", "type": "CLIP", "links": [7, 9] },
+        { "name": "VAE", "type": "VAE", "links": [8, 14] }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "CLIPTextEncode",
+      "pos": [1670, 20],
+      "size": [420, 160],
+      "inputs": [
+        { "name": "clip", "type": "CLIP", "link": 7 }
+      ],
+      "widgets_values": [
+        "high detail, realistic skin texture, natural lighting, cinematic lighting, 35mm film look, sharp focus, broadcast studio, realistic face, subtle shadow depth, photorealistic, preserved original color palette"
+      ],
+      "outputs": [
+        { "name": "CONDITIONING", "type": "CONDITIONING", "links": [10] }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "CLIPTextEncode",
+      "pos": [1670, 210],
+      "size": [420, 160],
+      "inputs": [
+        { "name": "clip", "type": "CLIP", "link": 9 }
+      ],
+      "widgets_values": [
+        "plastic skin, oversharpen, blurry, low quality, artifacts, cartoon, anime, fake face, wax skin, extra fingers, distorted eyes, overexposed, overprocessed"
+      ],
+      "outputs": [
+        { "name": "CONDITIONING", "type": "CONDITIONING", "links": [11] }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "VAEEncode",
+      "pos": [1330, 220],
+      "size": [260, 100],
+      "inputs": [
+        { "name": "pixels", "type": "IMAGE", "link": 5 },
+        { "name": "vae", "type": "VAE", "link": 8 }
+      ],
+      "outputs": [
+        { "name": "LATENT", "type": "LATENT", "links": [12] }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "KSampler",
+      "pos": [2130, 70],
+      "size": [320, 240],
+      "inputs": [
+        { "name": "model", "type": "MODEL", "link": 6 },
+        { "name": "positive", "type": "CONDITIONING", "link": 10 },
+        { "name": "negative", "type": "CONDITIONING", "link": 11 },
+        { "name": "latent_image", "type": "LATENT", "link": 12 }
+      ],
+      "widgets_values": [
+        123456789,
+        "fixed",
+        24,
+        5,
+        "dpmpp_2m",
+        "karras",
+        0.28
+      ],
+      "outputs": [
+        { "name": "LATENT", "type": "LATENT", "links": [13] }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "VAEDecode",
+      "pos": [2480, 90],
+      "size": [260, 100],
+      "inputs": [
+        { "name": "samples", "type": "LATENT", "link": 13 },
+        { "name": "vae", "type": "VAE", "link": 14 }
+      ],
+      "outputs": [
+        { "name": "IMAGE", "type": "IMAGE", "links": [15] }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "CodeFormerLoader",
+      "pos": [2760, 20],
+      "size": [260, 60],
+      "widgets_values": [
+        "codeformer.pth"
+      ],
+      "outputs": [
+        { "name": "FACE_MODEL", "type": "FACE_MODEL", "links": [16] }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "CodeFormerApply",
+      "pos": [2760, 110],
+      "size": [300, 120],
+      "inputs": [
+        { "name": "image", "type": "IMAGE", "link": 15 },
+        { "name": "facerestore_model", "type": "FACE_MODEL", "link": 16 }
+      ],
+      "widgets_values": [
+        0.8
+      ],
+      "outputs": [
+        { "name": "IMAGE", "type": "IMAGE", "links": [17] }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "UpscaleModelLoader",
+      "pos": [2760, 270],
+      "size": [260, 60],
+      "widgets_values": [
+        "4x-UltraSharp.pth"
+      ],
+      "outputs": [
+        { "name": "UPSCALE_MODEL", "type": "UPSCALE_MODEL", "links": [18] }
+      ]
+    },
+    {
+      "id": 15,
+      "type": "ImageUpscaleWithModel",
+      "pos": [3090, 180],
+      "size": [320, 110],
+      "inputs": [
+        { "name": "image", "type": "IMAGE", "link": 17 },
+        { "name": "upscale_model", "type": "UPSCALE_MODEL", "link": 18 }
+      ],
+      "outputs": [
+        { "name": "IMAGE", "type": "IMAGE", "links": [19] }
+      ]
+    },
+    {
+      "id": 16,
+      "type": "ImageSharpen",
+      "pos": [3440, 180],
+      "size": [240, 80],
+      "inputs": [
+        { "name": "image", "type": "IMAGE", "link": 19 }
+      ],
+      "widgets_values": [
+        0.18
+      ],
+      "outputs": [
+        { "name": "IMAGE", "type": "IMAGE", "links": [20] }
+      ]
+    },
+    {
+      "id": 17,
+      "type": "ImageColorBalance",
+      "pos": [3440, 300],
+      "size": [260, 90],
+      "inputs": [
+        { "name": "image", "type": "IMAGE", "link": 20 }
+      ],
+      "widgets_values": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "outputs": [
+        { "name": "IMAGE", "type": "IMAGE", "links": [21] }
+      ]
+    },
+    {
+      "id": 18,
+      "type": "VHS_SaveVideoFrames",
+      "pos": [3730, 180],
+      "size": [320, 140],
+      "inputs": [
+        { "name": "images", "type": "IMAGE", "link": 21 }
+      ],
+      "widgets_values": [
+        "output_frames",
+        "png"
+      ]
+    },
+    {
+      "id": 19,
+      "type": "PreviewImage",
+      "pos": [3730, 350],
+      "size": [300, 100],
+      "inputs": [
+        { "name": "images", "type": "IMAGE", "link": 21 }
+      ]
+    },
+    {
+      "id": 20,
+      "type": "Note",
+      "pos": [20, 20],
+      "size": [450, 160],
+      "widgets_values": [
+        "先在 ComfyUI 外部用 ffmpeg 做去隔行：\nffmpeg -i input.mp4 -vf yadif=1,deblock=filter=strong:alpha=0.1:beta=0.1 output_deinterlaced.mp4\n再拆帧送进 input_frames。"
+      ]
+    },
+    {
+      "id": 21,
+      "type": "Note",
+      "pos": [1320, 360],
+      "size": [420, 140],
+      "widgets_values": [
+        "如果你想更稳：\n1) SD denoise 保持 0.22~0.32\n2) CFG 不要超过 6\n3) Prompt 不要写太多电影镜头词，否则会变脸。"
+      ]
+    },
+    {
+      "id": 22,
+      "type": "Note",
+      "pos": [2760, 360],
+      "size": [420, 120],
+      "widgets_values": [
+        "CodeFormer fidelity 推荐 0.75~0.85。\n过低会太AI，过高变化不明显。"
+      ]
+    },
+    {
+      "id": 23,
+      "type": "Note",
+      "pos": [3090, 20],
+      "size": [420, 120],
+      "widgets_values": [
+        "UltraSharp 只作为最后精修，不负责创造真实细节。真实感主要来自 SD 低强度重建。"
+      ]
+    },
+    {
+      "id": 24,
+      "type": "PreviewImage",
+      "pos": [1000, 360],
+      "size": [280, 100],
+      "inputs": [
+        { "name": "images", "type": "IMAGE", "link": 24 }
+      ]
+    }
+  ],
+  "links": [
+    [1, 1, 0, 3, 0, "IMAGE"],
+    [2, 2, 0, 3, 1, "UPSCALE_MODEL"],
+    [3, 3, 0, 5, 0, "IMAGE"],
+    [4, 4, 0, 5, 1, "UPSCALE_MODEL"],
+    [5, 5, 0, 9, 0, "IMAGE"],
+    [6, 6, 0, 10, 0, "MODEL"],
+    [7, 6, 1, 7, 0, "CLIP"],
+    [8, 6, 2, 9, 1, "VAE"],
+    [9, 6, 1, 8, 0, "CLIP"],
+    [10, 7, 0, 10, 1, "CONDITIONING"],
+    [11, 8, 0, 10, 2, "CONDITIONING"],
+    [12, 9, 0, 10, 3, "LATENT"],
+    [13, 10, 0, 11, 0, "LATENT"],
+    [14, 6, 2, 11, 1, "VAE"],
+    [15, 11, 0, 13, 0, "IMAGE"],
+    [16, 12, 0, 13, 1, "FACE_MODEL"],
+    [17, 13, 0, 15, 0, "IMAGE"],
+    [18, 14, 0, 15, 1, "UPSCALE_MODEL"],
+    [19, 15, 0, 16, 0, "IMAGE"],
+    [20, 16, 0, 17, 0, "IMAGE"],
+    [21, 17, 0, 18, 0, "IMAGE"],
+    [24, 5, 0, 24, 0, "IMAGE"]
+  ]
+}

@@ -1,0 +1,263 @@
+{
+  "last_node_id": 120,
+  "last_link_id": 220,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LoadVideo",
+      "pos": [50, 100],
+      "size": [350, 450],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [1, 10, 50], "slot_index": 0},
+        {"name": "AUDIO", "type": "AUDIO", "links": null, "slot_index": 1}
+      ],
+      "properties": {"Node name": "LoadVideo"},
+      "widgets_values": ["old_video.mp4", "video", 0, 0, 1]
+    },
+    {
+      "id": 2,
+      "type": "CheckpointLoaderSimple",
+      "pos": [50, 600],
+      "size": [350, 98],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {"name": "MODEL", "type": "MODEL", "links": [5], "slot_index": 0},
+        {"name": "CLIP", "type": "CLIP", "links": [3, 4], "slot_index": 1},
+        {"name": "VAE", "type": "VAE", "links": [8, 30], "slot_index": 2}
+      ],
+      "properties": {"Node name": "CheckpointLoaderSimple"},
+      "widgets_values": ["AI-ModelScope/stable-diffusion-xl-base-1___0"]
+    },
+    {
+      "id": 3,
+      "type": "ControlNetLoader",
+      "pos": [50, 750],
+      "size": [350, 58],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {"name": "CONTROL_NET", "type": "CONTROL_NET", "links": [6], "slot_index": 0}
+      ],
+      "properties": {"Node name": "ControlNetLoader"},
+      "widgets_values": ["control_v11f1e_sd15_tile.pth"]
+    },
+    {
+      "id": 4,
+      "type": "CLIPTextEncode",
+      "pos": [450, 50],
+      "size": [550, 250],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 3}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [7], "slot_index": 0}],
+      "properties": {"Node name": "CLIPTextEncode"},
+      "widgets_values": ["(masterpiece, best quality, ultra-detailed, 8K, RAW photo:1.4), cinematic masterpiece, professional studio lighting, 35mm film, IMAX quality, highly detailed, photorealistic, natural skin texture, subsurface scattering, film grain, warm color grading, bokeh, depth of field, movie quality, ARRI Alexa 65, sharp focus, dramatic lighting, volumetric lighting, ray tracing, global illumination, HDR, dolby vision"]
+    },
+    {
+      "id": 5,
+      "type": "CLIPTextEncode",
+      "pos": [450, 330],
+      "size": [550, 250],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 4}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [9], "slot_index": 0}],
+      "properties": {"Node name": "CLIPTextEncode"},
+      "widgets_values": ["(worst quality, low quality, normal quality:1.5), blurry, noisy, distortion, artifact, lowres, oversaturated, plastic, digital look, sharp edges, amateur, flat lighting, grainy, deformed, ugly, bad anatomy, disfigured, poorly drawn, bad proportions, gross proportions"]
+    },
+    {
+      "id": 6,
+      "type": "ControlNetApplyAdvanced",
+      "pos": [450, 620],
+      "size": [350, 166],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {"name": "positive", "type": "CONDITIONING", "link": 7},
+        {"name": "negative", "type": "CONDITIONING", "link": 9},
+        {"name": "control_net", "type": "CONTROL_NET", "link": 6},
+        {"name": "image", "type": "IMAGE", "link": 10}
+      ],
+      "outputs": [
+        {"name": "positive", "type": "CONDITIONING", "links": [11], "slot_index": 0},
+        {"name": "negative", "type": "CONDITIONING", "links": [12], "slot_index": 1}
+      ],
+      "properties": {"Node name": "ControlNetApplyAdvanced"},
+      "widgets_values": [0.75, 0.0, 1.0]
+    },
+    {
+      "id": 7,
+      "type": "ImageScale",
+      "pos": [450, 820],
+      "size": [310, 130],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [{"name": "image", "type": "IMAGE", "link": 1}],
+      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [15], "slot_index": 0}],
+      "properties": {"Node name": "ImageScale"},
+      "widgets_values": ["lanczos", 1920, 1080, "disabled"]
+    },
+    {
+      "id": 8,
+      "type": "VAEEncode",
+      "pos": [1050, 50],
+      "size": [210, 46],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {"name": "pixels", "type": "IMAGE", "link": 15},
+        {"name": "vae", "type": "VAE", "link": 8}
+      ],
+      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [13], "slot_index": 0}],
+      "properties": {"Node name": "VAEEncode"}
+    },
+    {
+      "id": 9,
+      "type": "KSampler",
+      "pos": [1300, 50],
+      "size": [380, 320],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 5},
+        {"name": "positive", "type": "CONDITIONING", "link": 11},
+        {"name": "negative", "type": "CONDITIONING", "link": 12},
+        {"name": "latent_image", "type": "LATENT", "link": 13}
+      ],
+      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [14], "slot_index": 0}],
+      "properties": {"Node name": "KSampler"},
+      "widgets_values": [42, "randomize", 50, 7.0, "dpmpp_3m_sde", "karras", 0.40]
+    },
+    {
+      "id": 10,
+      "type": "VAEDecode",
+      "pos": [1720, 50],
+      "size": [210, 46],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {"name": "samples", "type": "LATENT", "link": 14},
+        {"name": "vae", "type": "VAE", "link": 30}
+      ],
+      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [16], "slot_index": 0}],
+      "properties": {"Node name": "VAEDecode"}
+    },
+    {
+      "id": 11,
+      "type": "SaveVideo",
+      "pos": [1970, 50],
+      "size": [550, 700],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {"name": "images", "type": "IMAGE", "link": 16},
+        {"name": "audio", "type": "AUDIO", "link": null}
+      ],
+      "outputs": [],
+      "properties": {"Node name": "SaveVideo"},
+      "widgets_values": ["ComfyUI_Ultimate_Cinematic", 24, "H264", "veryhigh", 0]
+    },
+    {
+      "id": 12,
+      "type": "Note",
+      "pos": [50, 1000],
+      "size": [500, 450],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": ["🎬🔥 SDXL 终极电影级扩散重绘 🔥\n\n输入：720x576 SD 视频\n输出：1920x1080 FHD 电影级\n\n💎 顶级配置：\n- 模型：SDXL Base 1.0\n- ControlNet: Tile (结构保持)\n- Denoise: 0.40 (强力扩散重绘)\n- CFG: 7.0 (强引导)\n- Steps: 50 (超高质量)\n- Sampler: DPM++ 3M SDE (顶级采样器)\n- ControlNet 强度：0.75\n- 放大算法：Lanczos (最清晰)\n\n✨ 效果特点：\n✓ IMAX 电影质感\n✓ 专业影棚布光\n✓ 35mm 胶片颗粒\n✓ 次表面散射 (皮肤)\n✓ 体积光/射线追踪\n✓ Dolby Vision HDR\n✓ ARRI Alexa 65 画质\n✓ 景深/散景效果\n\n⏱️ 处理时间：\n1 分钟视频 ≈ 30-60 分钟\n\n🎯 适合：重要项目/商业片"],
+      "color": "#2a363b",
+      "bgcolor": "#3f5159"
+    },
+    {
+      "id": 13,
+      "type": "Note",
+      "pos": [1100, 400],
+      "size": [400, 200],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": ["⚙️ 终极扩散重绘参数\n\nDenoise 0.40 = 强力重绘\n- 大幅重构光影\n- 生成全新细节\n- 电影级质感\n- 保持结构不变形\n\n可调范围：0.35-0.45\n(越高变化越大)"],
+      "color": "#3b2a2a",
+      "bgcolor": "#593f3f"
+    },
+    {
+      "id": 14,
+      "type": "Note",
+      "pos": [1550, 400],
+      "size": [350, 150],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": ["📤 输出设置\n\n格式：MP4 H264\n分辨率：1920x1080\n帧率：24fps (电影标准)\n码率：Very High (最高画质)"],
+      "color": "#2a3b3b",
+      "bgcolor": "#3f5959"
+    },
+    {
+      "id": 15,
+      "type": "Note",
+      "pos": [500, 850],
+      "size": [350, 120],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": ["🔍 Lanczos 放大\n\n最清晰的放大算法\n保留最多细节\n适合高质量输出"],
+      "color": "#2a363b",
+      "bgcolor": "#3f5159"
+    }
+  ],
+  "links": [
+    [1, 1, 0, 7, 0, "IMAGE"],
+    [3, 2, 1, 4, 0, "CLIP"],
+    [4, 2, 1, 5, 0, "CLIP"],
+    [5, 2, 0, 9, 0, "MODEL"],
+    [6, 3, 0, 6, 2, "CONTROL_NET"],
+    [7, 4, 0, 6, 0, "CONDITIONING"],
+    [8, 2, 2, 8, 1, "VAE"],
+    [9, 5, 0, 6, 1, "CONDITIONING"],
+    [10, 1, 0, 6, 3, "IMAGE"],
+    [11, 6, 0, 9, 1, "CONDITIONING"],
+    [12, 6, 1, 9, 2, "CONDITIONING"],
+    [13, 8, 0, 9, 3, "LATENT"],
+    [14, 9, 0, 10, 0, "LATENT"],
+    [15, 7, 0, 8, 0, "IMAGE"],
+    [16, 10, 0, 11, 0, "IMAGE"],
+    [30, 2, 2, 10, 1, "VAE"],
+    [50, 1, 0, 6, 3, "IMAGE"]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {"scale": 1, "offset": [0, 0]}
+  },
+  "version": 0.4
+}
