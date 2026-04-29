@@ -689,6 +689,8 @@ export class TaskExecutor {
         this.injectImageToImageNodes(apiWorkflow, comfyuiImageFile);
       }
 
+      this.sanitizeSam2Inputs(apiWorkflow);
+
       // 🔧 规范化 combo widget 值
       return await this.normalizeComboValues(apiWorkflow);
     }
@@ -711,6 +713,8 @@ export class TaskExecutor {
 
         // 兜底：把主提示词写回对应节点，防止转换链路里的默认值覆盖
         this.injectPromptText(comfyConverted, task.prompt, promptParamIds);
+
+        this.sanitizeSam2Inputs(comfyConverted);
 
         return await this.normalizeComboValues(comfyConverted);
       }
@@ -738,6 +742,8 @@ export class TaskExecutor {
       // 兜底：把主提示词写回对应节点，防止转换链路里的默认值覆盖
       this.injectPromptText(converted, task.prompt, promptParamIds);
 
+      this.sanitizeSam2Inputs(converted);
+
       // 🔧 规范化 combo widget 值
       return await this.normalizeComboValues(converted);
     } else {
@@ -753,6 +759,8 @@ export class TaskExecutor {
       }
 
       this.injectPromptText(wf, task.prompt, promptParamIds);
+
+      this.sanitizeSam2Inputs(wf);
 
       // 🔧 规范化 combo widget 值
       return await this.normalizeComboValues(wf);
@@ -864,12 +872,32 @@ export class TaskExecutor {
         node.inputs[paramName] = value;
       }
     }
+
   }
 
   private resolveWorkflowNodeIds(apiWorkflow: Record<string, any>, nodeId: string): string[] {
     const ids = Object.keys(apiWorkflow).filter(id => id === nodeId || id.endsWith(`:${nodeId}`));
     if (ids.length > 0) return ids;
     return [];
+  }
+
+  /**
+   * 只处理 SAM2 的两个可选坐标输入：
+   * 空字符串 / null / undefined 时直接移除，避免被当成“有值但类型错误”的输入。
+   */
+  private sanitizeSam2Inputs(apiWorkflow: Record<string, any>): void {
+    for (const node of Object.values(apiWorkflow) as any[]) {
+      if (!node || !node.inputs) continue;
+      if (String(node.class_type || '') !== 'Sam2Segmentation') continue;
+
+      for (const key of ['coordinates_positive', 'coordinates_negative']) {
+        const value = node.inputs[key];
+        if (value === undefined || value === null) continue;
+        if (typeof value === 'string' && value.trim() === '') {
+          delete node.inputs[key];
+        }
+      }
+    }
   }
 
   /**
