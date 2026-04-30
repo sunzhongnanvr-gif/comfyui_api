@@ -84,7 +84,7 @@ export class TaskExecutor {
 
   /**
    * 寻找空闲节点
-   * 必须满足：running === 0
+   * 必须满足：running === 0 且 pending === 0
    */
   private async findFreeNode(): Promise<ComfyUINode | null> {
     const nodes = await this.getActiveNodes();
@@ -100,12 +100,12 @@ export class TaskExecutor {
         load = await this.getNodeLoad(node);
       }
 
-      // 只有完全空闲才返回
-      if (load.running === 0) {
+      // 只有完全空闲才返回：运行中和排队中都必须为 0
+      if (load.running === 0 && load.pending === 0) {
         console.log(`✅ 找到空闲节点: ${node.name} (优先级 ${node.priority})`);
         return node;
       } else {
-        console.log(`⏳ 节点 ${node.name} 忙碌中 (${load.running} 任务运行)`);
+        console.log(`⏳ 节点 ${node.name} 忙碌中 (running=${load.running}, pending=${load.pending})`);
       }
     }
     
@@ -655,10 +655,15 @@ export class TaskExecutor {
     }
   }
 
-  private async resolveTaskFilesForNode(task: any, node: ComfyUINode): Promise<{ parameters: Record<string, any>; referenceComfyuiFilename: string | null }> {
+  private async resolveTaskFilesForNode(task: any, node: ComfyUINode): Promise<{
+    parameters: Record<string, any>;
+    referenceComfyuiFilename: string | null;
+    cleanupUserDataFiles: string[];
+  }> {
     const parameters = task.parameters ? JSON.parse(task.parameters) : {};
     const resolvedParameters: Record<string, any> = { ...parameters };
     const workflowParams = task.workflow?.parameters ? JSON.parse(task.workflow.parameters) : [];
+    const cleanupUserDataFiles = new Set<string>();
 
     const resolveUploadedFile = async (value: any): Promise<string | null> => {
       if (value === undefined || value === null || value === '') return null;
@@ -676,6 +681,9 @@ export class TaskExecutor {
       });
       if (!file) return null;
       const comfyuiFilename = (file as any).comfyuiFilename || await FileUploadService.syncRegisteredFileToComfyUI(file as any, node.url);
+      if (comfyuiFilename) {
+        cleanupUserDataFiles.add(comfyuiFilename);
+      }
       return comfyuiFilename || null;
     };
 
@@ -700,7 +708,11 @@ export class TaskExecutor {
       referenceComfyuiFilename = await resolveUploadedFile(task.referenceImgId);
     }
 
-    return { parameters: resolvedParameters, referenceComfyuiFilename };
+    return {
+      parameters: resolvedParameters,
+      referenceComfyuiFilename,
+      cleanupUserDataFiles: Array.from(cleanupUserDataFiles),
+    };
   }
 
   private getTaskParameterFlatKey(nodeId: string, paramName: string): string {
@@ -807,6 +819,77 @@ export class TaskExecutor {
 
       // 🔧 规范化 combo widget 值
       return await this.normalizeComboValues(wf);
+    }
+  }
+
+  private buildRemoteCleanupCandidates(value: string): string[] {
+    const normalized = value.trim().replace(/^\/+/, '');
+    if (!normalized) return [];
+
+    const candidates = new Set<string>();
+    candidates.add(normalized);
+    candidates.add(normalized.replace(/^input\//i, ''));
+    candidates.add(normalized.replace(/^output\//i, ''));
+
+    return Array.from(candidates).filter(Boolean);
+  }
+
+  private extractRemoteCleanupPathsFromOutputs(urls: string[]): string[] {
+    const candidates = new Set<string>();
+
+    for (const rawUrl of urls) {
+      try {
+        const urlObj = new URL(rawUrl, 'http://dummy');
+        const filename = urlObj.searchParams.get('filename');
+        if (!filename) continue;
+        const subfolder = (urlObj.searchParams.get('subfolder') || '').replace(/^\/+|\/+$/g, '');
+        const type = (urlObj.searchParams.get('type') || 'output').replace(/^\/+|\/+$/g, '');
+
+        const baseName = filename.replace(/^\/+/, '');
+        candidates.add(baseName);
+        candidates.add(`${type}/${baseName}`);
+        if (subfolder) {
+          candidates.add(`${type}/${subfolder}/${baseName}`);
+          candidates.add(`${subfolder}/${baseName}`);
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    return Array.from(candidates).filter(Boolean);
+  }
+
+  private async deleteRemoteUserDataFile(nodeUrl: string, filePath: string): Promise<boolean> {
+    const encoded = filePath.split('/').map(part => encodeURIComponent(part)).join('/');
+    try {
+      await axios.delete(`${nodeUrl}/userdata/${encoded}`, { timeout: 10000 });
+      console.log(`🧹 已清理节点临时文件: ${filePath}`);
+      return true;
+    } catch (error: any) {
+      const status = error.response?.status;
+      if (status === 404) return false;
+      console.warn(`⚠️ 清理节点临时文件失败: ${filePath} - ${error.message}`);
+      return false;
+    }
+  }
+
+  private async cleanupNodeTempFiles(node: ComfyUINode, inputFiles: string[], outputUrls: string[]): Promise<void> {
+    const candidates = new Set<string>();
+
+    for (const fileName of inputFiles) {
+      for (const candidate of this.buildRemoteCleanupCandidates(fileName)) {
+        candidates.add(`input/${candidate}`);
+        candidates.add(candidate);
+      }
+    }
+
+    for (const candidate of this.extractRemoteCleanupPathsFromOutputs(outputUrls)) {
+      candidates.add(candidate);
+    }
+
+    for (const filePath of candidates) {
+      await this.deleteRemoteUserDataFile(node.url, filePath);
     }
   }
 
@@ -1142,6 +1225,13 @@ export class TaskExecutor {
       console.log(`✅ 任务 ${taskId} 执行完成`);
       const outputs = this.parseOutputs(history);
       const { urls, fileInfos } = await this.downloadOutputs(taskId, userId, outputs, node);
+      const { cleanupUserDataFiles } = await this.resolveTaskFilesForNode(
+        await prisma.task.findUnique({
+          where: { id: taskId },
+          include: { workflow: true },
+        }),
+        node,
+      ).catch(() => ({ cleanupUserDataFiles: [] as string[] }));
 
       await prisma.task.update({
         where: { id: taskId },
@@ -1165,6 +1255,10 @@ export class TaskExecutor {
         } catch (e: any) {
           console.warn(`⚠️ 创建媒体记录失败: ${info.fileName} - ${e.message}`);
         }
+      }
+
+      if (cleanupUserDataFiles.length > 0 || outputs.length > 0) {
+        await this.cleanupNodeTempFiles(node, cleanupUserDataFiles, outputs);
       }
     } catch (error: any) {
       await this.markTaskFailed(taskId, `结果处理失败：${error.message}`);
