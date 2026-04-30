@@ -46,6 +46,7 @@ export interface WorkflowParamInputConfig {
 
 export interface WorkflowFieldConfig {
   surfaces?: Record<string, 'user' | 'setting' | 'both' | 'system'>;
+  requireds?: Record<string, boolean>;
 }
 
 export interface WorkflowInputField {
@@ -133,6 +134,7 @@ export class WorkflowParamService {
       const active = p.active ?? true;
       const normalizedDefault = this.normalizeParamDefault(p.type, p.default, parsed?.default);
       const surface = this.resolveSurfaceFromConfig(p.id, fieldConfig, (p as any).surface);
+      const required = this.resolveRequiredFromConfig(p.id, fieldConfig, p.required);
 
       if (!seedLike) {
       return {
@@ -141,6 +143,7 @@ export class WorkflowParamService {
         disabled: p.disabled ?? active === false,
         default: normalizedDefault,
         surface,
+        required,
       };
     }
 
@@ -158,6 +161,7 @@ export class WorkflowParamService {
       default: normalizedSeedDefault,
       seedMode: p.seedMode ?? 'random',
       surface,
+      required,
       };
     });
   }
@@ -179,6 +183,16 @@ export class WorkflowParamService {
   ): 'user' | 'setting' | 'both' | 'system' {
     const configured = fieldConfig?.surfaces?.[paramId];
     return this.normalizeSurface(configured ?? fallbackSurface);
+  }
+
+  private static resolveRequiredFromConfig(
+    paramId: string,
+    fieldConfig: WorkflowFieldConfig | null,
+    fallbackRequired: any,
+  ): boolean {
+    const configured = fieldConfig?.requireds?.[paramId];
+    if (configured !== undefined) return Boolean(configured);
+    return Boolean(fallbackRequired);
   }
 
   private static normalizeParamDefault(type: string, primaryDefault: any, fallbackDefault: any): any {

@@ -118,26 +118,30 @@ function normalizeParamSurface(value: any): ParamSurface {
 
 function buildFieldConfigPayload(params: any[]) {
   const surfaces: Record<string, ParamSurface> = {};
+  const requireds: Record<string, boolean> = {};
   params.forEach((param: any, index: number) => {
     const key = String(param?.id || '').trim() || `param-${index}`;
     surfaces[key] = normalizeParamSurface(param?.surface);
+    requireds[key] = Boolean(param?.required);
   });
-  return { surfaces };
+  return { surfaces, requireds };
 }
 
 function applyFieldConfigToParams(params: any[], fieldConfig: any) {
   const surfaces = fieldConfig?.surfaces || {};
+  const requireds = fieldConfig?.requireds || {};
   return params.map((param: any, index: number) => {
     const key = String(param?.id || '').trim() || `param-${index}`;
     return {
       ...param,
       surface: normalizeParamSurface(surfaces[key]),
+      required: requireds[key] ?? param?.required ?? false,
     };
   });
 }
 
 function stripFieldConfigFromParams(params: any[]) {
-  return params.map(({ surface, ...rest }: any) => rest);
+  return params.map(({ surface, required, ...rest }: any) => rest);
 }
 
 function groupParamsByNode(params: any[]) {
@@ -1808,11 +1812,11 @@ export default function WorkflowsPage() {
         <p style={{ color: '#666', marginBottom: 16 }}>
           已自动解析出 <b>{serverParsedParams.length}</b> 个参数。
           <br />
-          <Text type="secondary">勾选“可见”表示开放给用户；“激活/关闭”表示是否彻底跳过该参数；“位置”表示出现在用户页、设置页、两处或系统。</Text>
+        <Text type="secondary">勾选“可见”表示开放给用户；“激活/关闭”表示是否彻底跳过该参数；“位置”表示出现在用户页、设置页、两处或系统。</Text>
         </p>
         <GroupedParamEditor
           params={serverParsedParams}
-          mode="simple"
+          mode="full"
           onParamsChange={setServerParsedParams}
         />
         <div style={{ marginTop: 16, display: 'flex' }}>
@@ -1860,7 +1864,7 @@ export default function WorkflowsPage() {
         ) : (
           <GroupedParamEditor
             params={editParamParams}
-            mode="simple"
+            mode="full"
             onParamsChange={setEditParamParams}
           />
         )}
@@ -2031,7 +2035,7 @@ function GroupedParamEditor({
     {
       title: '可见',
       key: 'visible',
-      width: 30,
+      width: 56,
       render: (_: any, record: any) => (
         <Checkbox
           checked={record?.visible ?? true}
@@ -2039,6 +2043,17 @@ function GroupedParamEditor({
         />
       ),
     },
+    ...(mode === 'full' ? [{
+      title: '必填',
+      key: 'required',
+      width: 64,
+      render: (_: any, record: any) => (
+        <Checkbox
+          checked={record?.required ?? false}
+          onChange={e => updateParam(record.__index, { required: e.target.checked })}
+        />
+      ),
+    }] : []),
     {
       title: '位置',
       key: 'surface',
@@ -2058,17 +2073,6 @@ function GroupedParamEditor({
         />
       ),
     },
-    ...(mode === 'full' ? [{
-      title: '必填',
-      key: 'required',
-      width: 30,
-      render: (_: any, record: any) => (
-        <Checkbox
-          checked={record?.required ?? false}
-          onChange={e => updateParam(record.__index, { required: e.target.checked })}
-        />
-      ),
-    }] : []),
     {
       title: '参数名',
       dataIndex: 'id',

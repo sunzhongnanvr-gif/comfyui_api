@@ -180,6 +180,102 @@ function inferApiInputType(classType: string, inputName: string, value: any): st
   return inferTypeFromValue(value);
 }
 
+function inferShellInputType(inputName: string, inputDef: any): string {
+  const declaredType = String(
+    inputDef?.type ||
+    inputDef?.inputType ||
+    inputDef?.widgetType ||
+    inputDef?.kind ||
+    ''
+  ).trim();
+  if (declaredType) {
+    const normalized = normalizeObjectInfoType(declaredType);
+    if (MODEL_CONNECTION_TYPES.has(normalized) || ['INT', 'FLOAT', 'BOOLEAN', 'STRING', 'COMBO'].includes(normalized)) {
+      return normalized;
+    }
+  }
+
+  const name = String(inputName || '').toLowerCase();
+  if (name.includes('image')) return 'IMAGE';
+  if (name.includes('video')) return 'VIDEO';
+  if (name.includes('audio')) return 'AUDIO';
+  if (name.includes('mask')) return 'MASK';
+  if (name.includes('latent')) return 'LATENT';
+  if (name.includes('bbox') || name.includes('box')) return 'BBOX';
+  if (name.includes('prompt') || name.includes('text')) return 'STRING';
+  return 'STRING';
+}
+
+function getShellInputDefs(subgraph: any, shellNode: any): any[] {
+  const shellInputs = Array.isArray(shellNode?.inputs) ? shellNode.inputs : [];
+  if (shellInputs.length > 0) return shellInputs;
+  if (Array.isArray(subgraph?.inputs)) return subgraph.inputs;
+  return [];
+}
+
+function getShellInputName(inputDef: any): string {
+  return String(
+    inputDef?.name ||
+    inputDef?.widgetName ||
+    inputDef?.widget_name ||
+    inputDef?.label ||
+    ''
+  ).trim();
+}
+
+function getShellInputDefault(inputDef: any): any {
+  if (!inputDef) return undefined;
+  if (inputDef.default !== undefined) return inputDef.default;
+  if (inputDef.defaultValue !== undefined) return inputDef.defaultValue;
+  if (inputDef.value !== undefined) return inputDef.value;
+  if (inputDef.initialValue !== undefined) return inputDef.initialValue;
+  return undefined;
+}
+
+function getShellInputLabel(inputName: string, inputDef: any): string {
+  const label = String(inputDef?.label || inputDef?.title || inputName || '').trim();
+  const optional = inputDef?.optional === true || inputDef?.required === false;
+  if (!label) return optional ? `${inputName} (optional)` : inputName;
+  return optional && !/\(optional\)$/i.test(label) ? `${label} (optional)` : label;
+}
+
+function addShellInputParams(subgraph: any, shellNode: any, params: WorkflowParam[], context: ScanContext = {}): void {
+  if (!subgraph || !shellNode) return;
+  const shellInputs = getShellInputDefs(subgraph, shellNode);
+  if (!Array.isArray(shellInputs) || shellInputs.length === 0) return;
+
+  const shellDisabled = context.disabled ?? isBypassedNode(shellNode);
+  const shellNodeId = String(shellNode.id);
+  const shellNodeTitle = String(subgraph.name || getNodeTitle(shellNode, shellNode.type) || '').trim();
+
+  for (const inputDef of shellInputs) {
+    if (!inputDef) continue;
+    const inputName = getShellInputName(inputDef);
+    if (!inputName) continue;
+
+    const paramId = `${shellNodeId}.${inputName}`;
+    if (params.some(p => p.id === paramId)) continue;
+
+    const defaultValue = getShellInputDefault(inputDef);
+    params.push({
+      id: paramId,
+      nodeId: shellNodeId,
+      parentNodeId: context.parentNodeId,
+      parentNodeTitle: context.parentNodeTitle || shellNodeTitle || undefined,
+      type: inferShellInputType(inputName, inputDef),
+      default: defaultValue,
+      label: getShellInputLabel(inputName, inputDef),
+      visible: true,
+      active: !shellDisabled,
+      disabled: shellDisabled,
+      widgetName: inputName,
+      nodeTitle: shellNodeTitle || getNodeTitle(shellNode, shellNode.type),
+      nodeType: shellNode.type,
+      required: inputDef?.required !== undefined ? Boolean(inputDef.required) : inputDef?.optional === true ? false : undefined,
+    });
+  }
+}
+
 /** 生成友好的参数标签 */
 function generateLabel(name: string, nodeType: string): string {
   // 已知节点的中文映射
@@ -623,6 +719,15 @@ export function parseWorkflowParamsV2(workflow: any): WorkflowParam[] {
     const shellNode = nodes.find((n: any) => n.type === subgraph.id);
     const shellDisabled = shellNode ? isBypassedNode(shellNode) : false;
     const shellTitle = String(subgraph.name || (shellNode ? getNodeTitle(shellNode, shellNode.type) : '') || '').trim();
+
+    // 先把壳子节点的对外输入口补进参数列表
+    if (shellNode) {
+      addShellInputParams(subgraph, shellNode, params, {
+        parentNodeId: String(shellNode.id),
+        parentNodeTitle: shellTitle || getNodeTitle(shellNode, shellNode.type),
+        disabled: shellDisabled,
+      });
+    }
 
     // 扫描 subgraph 内部节点的 widgets
     const subNodes = subgraph.nodes || [];
