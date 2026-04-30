@@ -44,7 +44,7 @@ type AccessConfigForm = {
   submitUserIds: string[];
 };
 
-type ParamSurface = 'user' | 'setting' | 'both' | 'system';
+type ParamSurface = 'user' | 'setting' | 'both';
 
 const DEFAULT_ACCESS_FORM: AccessConfigForm = {
   visible: true,
@@ -112,8 +112,8 @@ function buildAccessConfigPayload(values: AccessConfigForm) {
 }
 
 function normalizeParamSurface(value: any): ParamSurface {
-  if (value === 'setting' || value === 'both' || value === 'user' || value === 'system') return value;
-  return 'setting';
+  if (value === 'setting' || value === 'both' || value === 'user') return value;
+  return 'user';
 }
 
 function buildFieldConfigPayload(params: any[]) {
@@ -1178,7 +1178,7 @@ export default function WorkflowsPage() {
       const data = await res.json();
 
       if (data.success) {
-        const filename = data.data.input_filename || data.data.filename;
+        const filename = data.data.filename;
         testForm.setFieldsValue({
           [nodeId]: {
             [paramName]: filename,
@@ -1808,7 +1808,7 @@ export default function WorkflowsPage() {
         <p style={{ color: '#666', marginBottom: 16 }}>
           已自动解析出 <b>{serverParsedParams.length}</b> 个参数。
           <br />
-          <Text type="secondary">勾选“可见”表示开放给用户；“激活/关闭”表示是否彻底跳过该参数；“位置”表示出现在用户页、设置页、两处或系统。</Text>
+          <Text type="secondary">勾选“可见”表示开放给用户；“激活/关闭”表示是否彻底跳过该参数；“位置”表示出现在用户页、设置页或两处。</Text>
         </p>
         <GroupedParamEditor
           params={serverParsedParams}
@@ -1853,7 +1853,7 @@ export default function WorkflowsPage() {
         <p style={{ color: '#666', marginBottom: 16 }}>
           共 <b>{editParamParams.length}</b> 个参数。
           <br />
-          <Text type="secondary">勾选“可见”表示开放给用户；“激活/关闭”表示是否彻底跳过该参数；“位置”表示出现在用户页、设置页、两处或系统。</Text>
+          <Text type="secondary">勾选“可见”表示开放给用户；“激活/关闭”表示是否彻底跳过该参数；“位置”表示出现在用户页、设置页或两处。</Text>
         </p>
         {editParamParams.length === 0 ? (
           <Alert message="未检测到参数" description="该工作流可能没有可配置的参数" type="info" showIcon />
@@ -1941,15 +1941,14 @@ function GroupedParamEditor({
       );
     }
 
-    if (paramType === 'IMAGE' || paramType === 'VIDEO' || paramType === 'AUDIO') {
-      const mediaLabel = paramType === 'IMAGE' ? '图片' : paramType === 'VIDEO' ? '视频' : '音频';
+    if (paramType === 'IMAGE') {
       return (
         <Space size={4}>
           <Input
             size="small"
             style={{ width: 140 }}
             value={param?.default ?? ''}
-            placeholder={`${mediaLabel}文件名`}
+            placeholder="ComfyUI 文件名"
             onChange={e => updateParam(index, { default: e.target.value })}
           />
           <Upload
@@ -1961,7 +1960,7 @@ function GroupedParamEditor({
                 formData.append('file', file);
                 const base = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.1.100:3001/api/v1';
                 const token = localStorage.getItem('token');
-                const res = await fetch(`${base}/upload/input`, {
+                const res = await fetch(`${base}/user/files/upload`, {
                   method: 'POST',
                   headers: { 'Authorization': `Bearer ${token}` },
                   body: formData,
@@ -1979,7 +1978,7 @@ function GroupedParamEditor({
               return false;
             }}
           >
-              <Button size="small" icon={<UploadOutlined />}>上传</Button>
+            <Button size="small" icon={<UploadOutlined />}>上传</Button>
           </Upload>
         </Space>
       );
@@ -2046,14 +2045,13 @@ function GroupedParamEditor({
       render: (_: any, record: any) => (
         <Select
           size="small"
-          value={record?.surface || 'setting'}
+          value={record?.surface || 'user'}
           style={{ width: '100%' }}
           onChange={(value) => updateParam(record.__index, { surface: value })}
           options={[
             { value: 'user', label: '用户页' },
             { value: 'setting', label: '设置页' },
             { value: 'both', label: '两处' },
-            { value: 'system', label: '系统' },
           ]}
         />
       ),

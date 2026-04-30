@@ -13,6 +13,20 @@ import { TaskResourceService } from '../services/task-resource-service';
 
 const router = Router();
 
+async function loadWorkflowFieldConfig(workflowId: string): Promise<any | null> {
+  try {
+    const rows = await prisma.$queryRawUnsafe<any[]>(
+      'SELECT "fieldConfig" FROM "Workflow" WHERE id = $1 LIMIT 1',
+      workflowId
+    );
+    const raw = rows?.[0]?.fieldConfig;
+    if (!raw) return null;
+    return typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+}
+
 // ==================== 模型依赖检测 ====================
 
 // ComfyUI 节点类型 → 模型目录映射
@@ -1315,9 +1329,10 @@ router.get('/workflows/:id/params', async (req: AuthRequest, res: Response) => {
     const workflow = await prisma.workflow.findUnique({ where: { id } });
     if (!workflow) return res.status(404).json({ success: false, error: '工作流不存在' });
     const params = await WorkflowParamService.resolveParams(workflow);
+    const fieldConfig = await loadWorkflowFieldConfig(id);
     const fromDb = Boolean(workflow.parameters);
 
-    res.json({ success: true, data: { params, fromDb } });
+    res.json({ success: true, data: { params, fromDb, fieldConfig } });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -1327,7 +1342,7 @@ router.get('/workflows/:id/params', async (req: AuthRequest, res: Response) => {
 router.put('/workflows/:id/params', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { parameters } = req.body;
+    const { parameters, fieldConfig } = req.body;
 
     if (!Array.isArray(parameters)) {
       return res.status(400).json({ success: false, error: '参数必须是数组' });
@@ -1336,10 +1351,12 @@ router.put('/workflows/:id/params', async (req: AuthRequest, res: Response) => {
     const workflow = await prisma.workflow.findUnique({ where: { id } });
     if (!workflow) return res.status(404).json({ success: false, error: '工作流不存在' });
 
-    await prisma.workflow.update({
-      where: { id },
-      data: { parameters: JSON.stringify(parameters) },
-    });
+    await prisma.$executeRawUnsafe(
+      'UPDATE "Workflow" SET "parameters" = $1, "fieldConfig" = $2 WHERE "id" = $3',
+      JSON.stringify(parameters),
+      JSON.stringify(fieldConfig || { surfaces: {} }),
+      id
+    );
 
     res.json({ success: true, data: { message: '参数配置已保存' } });
   } catch (error: any) {

@@ -1,12 +1,25 @@
 import { Router, Response } from 'express';
 import { prisma } from '../config/database';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { upload } from '../middleware/upload';
 import { WorkflowParamService } from '../services/workflow-param-service';
 import { WorkflowManifestService } from '../services/workflow-manifest-service';
 import { parseWorkflowParams, mergeParamsWithConfig } from '../utils/workflow-parser';
 
 const router = Router();
+
+async function loadWorkflowFieldConfig(workflowId: string): Promise<any | null> {
+  try {
+    const rows = await prisma.$queryRawUnsafe<any[]>(
+      'SELECT "fieldConfig" FROM "Workflow" WHERE id = $1 LIMIT 1',
+      workflowId
+    );
+    const raw = rows?.[0]?.fieldConfig;
+    if (!raw) return null;
+    return typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+}
 
 // ==================== 查看当前积分 ====================
 
@@ -162,9 +175,9 @@ router.put('/profile', authenticate as any, async (req: AuthRequest, res: Respon
   }
 });
 
-// ==================== 获取工作流参数列表（用户端） ====================
+// ==================== 获取工作流输入列表（用户端） ====================
 
-router.get('/workflows/:slug/params', authenticate as any, async (req: AuthRequest, res: Response) => {
+const handleWorkflowInputs = async (req: AuthRequest, res: Response) => {
   try {
     const { slug } = req.params;
     const isTestMode = req.query.test === 'true';
@@ -181,61 +194,31 @@ router.get('/workflows/:slug/params', authenticate as any, async (req: AuthReque
     }
 
     // 获取可见参数
-    const visibleParams = await WorkflowParamService.getVisibleParams(workflow, isTestMode);
+    const fieldConfig = await loadWorkflowFieldConfig(workflow.id);
+    const fields = await WorkflowParamService.getVisibleInputFields(
+      { ...workflow, fieldConfig } as any,
+      isTestMode
+    );
 
     res.json({
       success: true,
       data: {
-        workflow_id: workflow.id,
-        workflow_name: workflow.name,
-        workflow_slug: workflow.slug,
-        credit_cost: workflow.creditCost,
-        estimated_time: workflow.type === 'video' ? 180 : 30,
+        workflowId: workflow.id,
+        workflowName: workflow.name,
+        workflowSlug: workflow.slug,
+        creditCost: workflow.creditCost,
+        estimatedTime: workflow.type === 'video' ? 180 : 30,
         access,
-        params: visibleParams,
+        fields,
       }
     });
   } catch (error: any) {
     console.error('❌ 获取工作流参数失败:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
-});
+};
 
-// ==================== 上传文件 ====================
-
-router.post('/files/upload', authenticate as any, upload.single('file') as any, async (req: AuthRequest, res: Response) => {
-  try {
-    const file = req.file;
-    if (!file) {
-      return res.status(400).json({ success: false, error: '请选择文件' });
-    }
-
-    const { getComfyUIUrl } = await import('../config/settings');
-    const { FileUploadService } = await import('../services/file-upload-service');
-    const comfyuiUrl = await getComfyUIUrl();
-
-    const uploadedFile = await FileUploadService.uploadAndRegister(
-      req.user!.id,
-      file,
-      comfyuiUrl,
-    );
-
-    res.status(201).json({
-      success: true,
-      data: {
-        file_id: uploadedFile.id,
-        filename: uploadedFile.originalName,
-        comfyui_filename: uploadedFile.comfyuiFilename,
-        mime_type: uploadedFile.mimeType,
-        size_bytes: uploadedFile.fileSize,
-        created_at: uploadedFile.createdAt,
-      }
-    });
-  } catch (error: any) {
-    console.error('❌ 文件上传失败:', error.message);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+router.get('/workflows/:slug/inputs', authenticate as any, handleWorkflowInputs);
 
 // ==================== 删除已上传文件 ====================
 

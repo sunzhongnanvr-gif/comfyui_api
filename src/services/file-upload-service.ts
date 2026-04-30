@@ -1,5 +1,6 @@
 import axios from 'axios';
 import FormData from 'form-data';
+import fs from 'fs';
 import { prisma } from '../config/database';
 
 const toSafeComfyFilename = (filename: string): string => {
@@ -12,6 +13,14 @@ const toSafeComfyFilename = (filename: string): string => {
 };
 
 export class FileUploadService {
+  private static getUploadBuffer(file: Express.Multer.File): Buffer {
+    if (file.buffer) return file.buffer;
+    if (file.path && fs.existsSync(file.path)) {
+      return fs.readFileSync(file.path);
+    }
+    throw new Error('上传文件缺少可读取的内容');
+  }
+
   /**
    * 上传文件到 ComfyUI
    * 根据 mimeType 自动选择 ComfyUI 上传接口
@@ -21,22 +30,13 @@ export class FileUploadService {
     comfyuiUrl: string,
   ): Promise<{ comfyuiFilename: string; uploadType: string }> {
     const mimeType = file.mimetype;
-
-    // 根据 MIME 选择 ComfyUI 上传接口
-    let uploadEndpoint: string;
-    if (mimeType.startsWith('image/')) {
-      uploadEndpoint = '/upload/image';
-    } else if (mimeType.startsWith('video/')) {
-      uploadEndpoint = '/upload/video';
-    } else if (mimeType.startsWith('audio/')) {
-      uploadEndpoint = '/upload/audio';
-    } else {
-      throw new Error(`不支持的文件类型: ${mimeType}`);
-    }
+    // 统一走图片上传口，避免视频/音频节点在部分环境下返回 405
+    const uploadEndpoint = '/upload/image';
 
     // 构建 FormData
     const formData = new FormData();
-    formData.append('image', file.buffer, {
+    const uploadBuffer = this.getUploadBuffer(file);
+    formData.append('image', uploadBuffer, {
       filename: toSafeComfyFilename(file.originalname),
       contentType: mimeType,
     });

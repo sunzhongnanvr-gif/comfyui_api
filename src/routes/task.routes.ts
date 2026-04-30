@@ -80,6 +80,30 @@ router.post('/:workflowSlug', authenticate as any, upload.any() as any, async (r
       }
     }
 
+    // 合并历史已上传文件，支持“先上传、后提交”场景
+    const historicalFiles = await prisma.uploadedFile.findMany({
+      where: { userId: req.user!.id },
+      select: {
+        id: true,
+        filename: true,
+        originalName: true,
+        comfyuiFilename: true,
+        mimeType: true,
+        fileSize: true,
+        storagePath: true,
+        createdAt: true,
+      }
+    });
+    const allUploadedFilesMap = new Map<string, any>();
+    for (const file of [...historicalFiles, ...uploadedFiles]) {
+      if (!file) continue;
+      if (file.id) allUploadedFilesMap.set(file.id, file);
+      if (file.comfyuiFilename) allUploadedFilesMap.set(file.comfyuiFilename, file);
+      if (file.filename) allUploadedFilesMap.set(file.filename, file);
+      if (file.originalName) allUploadedFilesMap.set(file.originalName, file);
+    }
+    const allUploadedFiles = Array.from(allUploadedFilesMap.values());
+
     // 向后兼容：支持旧的 reference_image_id 字段
     if (submittedParams.reference_image_id) {
       // 查找对应的 IMAGE 类型参数
@@ -90,7 +114,7 @@ router.post('/:workflowSlug', authenticate as any, upload.any() as any, async (r
     }
 
     // 验证参数
-    const errors = WorkflowParamService.validateParams(submittedParams, visibleParams, uploadedFiles);
+    const errors = WorkflowParamService.validateParams(submittedParams, visibleParams, allUploadedFiles);
     if (errors.length > 0) {
       return res.status(400).json({
         success: false,
@@ -124,13 +148,13 @@ router.post('/:workflowSlug', authenticate as any, upload.any() as any, async (r
     const promptField = WorkflowParamService.findPromptField(submittedParams, visibleParams);
 
     // 构建扁平参数
-    const flatParams = WorkflowParamService.buildTaskParameters(submittedParams, visibleParams, uploadedFiles);
+    const flatParams = WorkflowParamService.buildTaskParameters(submittedParams, visibleParams, allUploadedFiles);
     if (promptField) {
       delete flatParams[WorkflowParamService.paramIdToFlatKey(promptField.id)];
     }
 
     // 提取参考图片 ID（兼容旧逻辑）
-    const referenceImgId = WorkflowParamService.extractReferenceImage(submittedParams, visibleParams, uploadedFiles)
+    const referenceImgId = WorkflowParamService.extractReferenceImage(submittedParams, visibleParams, allUploadedFiles)
       || (submittedParams.reference_image_id as string) || null;
 
     // 扣除积分（非测试模式）

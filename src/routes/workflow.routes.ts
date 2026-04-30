@@ -6,6 +6,20 @@ import { WorkflowParamService } from '../services/workflow-param-service';
 
 const router = Router();
 
+async function loadWorkflowFieldConfig(workflowId: string): Promise<any | null> {
+  try {
+    const rows = await prisma.$queryRawUnsafe<any[]>(
+      'SELECT "fieldConfig" FROM "Workflow" WHERE id = $1 LIMIT 1',
+      workflowId
+    );
+    const raw = rows?.[0]?.fieldConfig;
+    if (!raw) return null;
+    return typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+}
+
 // ==================== 获取可用工作流列表（Android 端） ====================
 
 router.get('/', authenticate as any, async (req: AuthRequest, res: Response) => {
@@ -41,8 +55,6 @@ router.get('/', authenticate as any, async (req: AuthRequest, res: Response) => 
         timeout: w.timeout,
         icon: w.type === 'video' ? '🎬' : w.type === 'image' ? '🎨' : '✨',
         canSubmit: w.access.canSubmit,
-        visible: w.access.visible,
-        accessReason: w.access.reason,
       }));
 
     res.json({
@@ -76,7 +88,11 @@ router.get('/:slug/inputs', authenticate as any, async (req: AuthRequest, res: R
       return res.status(404).json({ success: false, error: '工作流不存在或已禁用' });
     }
 
-    const params = await WorkflowParamService.getVisibleParamInputs(workflow, false);
+    const fieldConfig = await loadWorkflowFieldConfig(workflow.id);
+    const fields = await WorkflowParamService.getVisibleInputFields(
+      { ...workflow, fieldConfig } as any,
+      false
+    );
 
     res.json({
       success: true,
@@ -87,7 +103,7 @@ router.get('/:slug/inputs', authenticate as any, async (req: AuthRequest, res: R
         creditCost: workflow.creditCost,
         timeout: workflow.timeout ?? null,
         access,
-        params,
+        fields,
       }
     });
   } catch (error) {

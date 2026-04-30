@@ -44,6 +44,23 @@ export interface WorkflowParamInputConfig {
   placeholder?: string;
 }
 
+export interface WorkflowFieldConfig {
+  surfaces?: Record<string, 'user' | 'setting' | 'both' | 'system'>;
+}
+
+export interface WorkflowInputField {
+  key: string;
+  label: string;
+  inputType: string;
+  defaultValue?: any;
+  required: boolean;
+  surface: 'user' | 'setting' | 'both' | 'system';
+  placeholder?: string;
+  options?: string[];
+  min?: number;
+  max?: number;
+}
+
 export interface ValidationError {
   param: string;
   message: string;
@@ -55,9 +72,25 @@ export class WorkflowParamService {
   }
 
   /**
+   * 按多种标识查找已上传文件。
+   * 支持 file_id、comfyuiFilename/input_filename、filename、originalName。
+   */
+  private static findUploadedFile(uploadedFiles: any[] | undefined, value: any): any | null {
+    if (!uploadedFiles || value === undefined || value === null) return null;
+    const text = String(value);
+    return uploadedFiles.find((file: any) =>
+      file?.id === text ||
+      file?.comfyuiFilename === text ||
+      file?.filename === text ||
+      file?.originalName === text
+    ) || null;
+  }
+
+  /**
    * 统一读取提交参数，兼容：
    * - 原始参数 id: "27.text"
-   * - 扁平参数 key: "27.inputs.text"
+   * - 扁平参数 key: "27.text"
+   * - 旧版扁平参数 key: "27.inputs.text"
    * - 仅 widgetName: "text"
    */
   private static getSubmittedValue(
@@ -74,6 +107,11 @@ export class WorkflowParamService {
       return submitted[flatKey];
     }
 
+    const legacyFlatKey = this.paramIdToLegacyFlatKey(paramId);
+    if (Object.prototype.hasOwnProperty.call(submitted, legacyFlatKey)) {
+      return submitted[legacyFlatKey];
+    }
+
     if (widgetName && Object.prototype.hasOwnProperty.call(submitted, widgetName)) {
       return submitted[widgetName];
     }
@@ -87,12 +125,14 @@ export class WorkflowParamService {
   static async resolveParams(workflow: any): Promise<WorkflowParam[]> {
     const parsedParams = await parseWorkflowParamsAsync(JSON.parse(workflow.template));
     const savedParams = workflow.parameters ? JSON.parse(workflow.parameters) : [];
+    const fieldConfig = this.parseFieldConfig(workflow.fieldConfig);
     const parsedMap = new Map(parsedParams.map(p => [p.id, p]));
     return mergeParamsWithConfig(parsedParams, savedParams).map(p => {
       const parsed = parsedMap.get(p.id);
       const seedLike = this.isSeedLikeParam(p);
       const active = p.active ?? true;
       const normalizedDefault = this.normalizeParamDefault(p.type, p.default, parsed?.default);
+      const surface = this.resolveSurfaceFromConfig(p.id, fieldConfig, (p as any).surface);
 
       if (!seedLike) {
       return {
@@ -100,6 +140,7 @@ export class WorkflowParamService {
         active,
         disabled: p.disabled ?? active === false,
         default: normalizedDefault,
+        surface,
       };
     }
 
@@ -116,8 +157,28 @@ export class WorkflowParamService {
       type: 'INT',
       default: normalizedSeedDefault,
       seedMode: p.seedMode ?? 'random',
+      surface,
       };
     });
+  }
+
+  private static parseFieldConfig(raw: any): WorkflowFieldConfig | null {
+    if (!raw) return null;
+    try {
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private static resolveSurfaceFromConfig(
+    paramId: string,
+    fieldConfig: WorkflowFieldConfig | null,
+    fallbackSurface: any,
+  ): 'user' | 'setting' | 'both' | 'system' {
+    const configured = fieldConfig?.surfaces?.[paramId];
+    return this.normalizeSurface(configured ?? fallbackSurface);
   }
 
   private static normalizeParamDefault(type: string, primaryDefault: any, fallbackDefault: any): any {
@@ -149,6 +210,16 @@ export class WorkflowParamService {
     const activeParams = allParams.filter(p => p.active !== false);
     const visibleParams = testMode ? activeParams : activeParams.filter(p => p.visible);
     return visibleParams.map(p => this.toInputConfig(p));
+  }
+
+  /**
+   * 获取 Android/Web 客户端输入字段清单。
+   */
+  static async getVisibleInputFields(workflow: any, testMode = false): Promise<WorkflowInputField[]> {
+    const allParams = await this.resolveParams(workflow);
+    const activeParams = allParams.filter(p => p.active !== false);
+    const visibleParams = testMode ? activeParams : activeParams.filter(p => p.visible);
+    return visibleParams.map(p => this.toClientField(p));
   }
 
   /**
@@ -206,6 +277,27 @@ export class WorkflowParamService {
       min: p.min,
       max: p.max,
       placeholder: p.placeholder,
+    };
+  }
+
+  /**
+   * 将参数转换成 Android/Web 客户端输入字段格式。
+   */
+  static toClientField(p: WorkflowParam): WorkflowInputField {
+    const key = this.paramIdToFlatKey(p.id);
+    const inputType = this.normalizeClientInputType(p.type, p);
+    const surface = this.normalizeSurface((p as any).surface);
+    return {
+      key,
+      label: p.label,
+      inputType,
+      defaultValue: p.default,
+      required: Boolean(p.required),
+      surface,
+      placeholder: p.placeholder,
+      options: p.comboOptions,
+      min: p.min,
+      max: p.max,
     };
   }
 
@@ -303,15 +395,11 @@ export class WorkflowParamService {
         }
       }
 
-      // 文件参数：检查 fileId 是否存在且属于当前用户
+      // 文件参数：检查引用是否存在且属于当前用户
       if (['IMAGE', 'VIDEO', 'AUDIO'].includes(param.type) && typeof value === 'string') {
-        // 如果是 fileId 格式（以 file_ 开头）
-        if (value.startsWith('file_') || value.includes('-')) {
-          // 在已上传文件中查找
-          const found = uploadedFiles?.find((f: any) => f.id === value);
-          if (!found) {
-            errors.push({ param: id, message: `${param.label} 引用的文件不存在` });
-          }
+        const found = this.findUploadedFile(uploadedFiles, value);
+        if (!found) {
+          errors.push({ param: id, message: `${param.label} 引用的文件不存在` });
         }
       }
     }
@@ -320,8 +408,8 @@ export class WorkflowParamService {
   }
 
   /**
-   * 构建扁平格式参数（task-executor 期望的格式）
-   * "nodeId.inputs.paramName": value
+   * 构建扁平格式参数（客户端提交用）
+   * "nodeId.paramName": value
    */
   static buildTaskParameters(
     submitted: Record<string, any>,
@@ -338,13 +426,12 @@ export class WorkflowParamService {
       // 文件类型参数：将 fileId 转换为 comfyuiFilename
       if (['IMAGE', 'VIDEO', 'AUDIO'].includes(param.type)) {
         if (typeof value === 'string') {
-          // 如果是 fileId，查找 comfyuiFilename
-          const found = uploadedFiles?.find((f: any) => f.id === value);
+          // 尽量把客户端传入的值归一化成执行端能识别的文件名
+          const found = this.findUploadedFile(uploadedFiles, value);
           if (found) {
             const flatKey = this.paramIdToFlatKey(paramId);
             result[flatKey] = found.comfyuiFilename;
           } else {
-            // 可能直接传的是 comfyuiFilename
             const flatKey = this.paramIdToFlatKey(paramId);
             result[flatKey] = value;
           }
@@ -406,17 +493,48 @@ export class WorkflowParamService {
   }
 
   /**
-   * 将参数 ID 转换为扁平格式 key
-   * "42.text" → "42.inputs.text"
-   * "57:3.seed" → "57:3.inputs.seed"
+   * 将参数 ID 转换为客户端提交 key
+   * "42.text" → "42.text"
+   * "57:3.seed" → "57:3.seed"
    */
   static paramIdToFlatKey(paramId: string): string {
-    if (paramId.includes('.inputs.')) return paramId; // 已经是扁平格式
+    if (paramId.includes('.inputs.')) {
+      const match = paramId.match(/^(.+?)\.inputs\.(.+)$/);
+      if (!match) return paramId;
+      return `${match[1]}.${match[2]}`;
+    }
+    if (paramId.includes('.')) {
+      const [nodeId, widgetName] = paramId.split('.');
+      return `${nodeId}.${widgetName}`;
+    }
+    return paramId;
+  }
+
+  /**
+   * 向后兼容旧扁平 key：nodeId.inputs.paramName
+   */
+  static paramIdToLegacyFlatKey(paramId: string): string {
+    if (paramId.includes('.inputs.')) return paramId;
     if (paramId.includes('.')) {
       const [nodeId, widgetName] = paramId.split('.');
       return `${nodeId}.inputs.${widgetName}`;
     }
     return paramId;
+  }
+
+  private static normalizeClientInputType(type: string, param: WorkflowParam): string {
+    const raw = String(type || '').toUpperCase();
+    if (raw === 'STRING' || raw === 'TEXT') return 'TEXT';
+    if (raw === 'INT' || raw === 'FLOAT' || raw === 'BOOLEAN' || raw === 'COMBO') return raw;
+    if (raw === 'IMAGE' || raw === 'VIDEO' || raw === 'AUDIO') return raw;
+    if (raw === 'MODEL' || raw === 'CLIP' || raw === 'VAE' || raw === 'CONTROL_NET' || raw === 'CONDITIONING' || raw === 'MASK' || raw === 'LATENT' || raw === 'BBOX') return raw;
+    if (param.comboOptions && param.comboOptions.length > 0) return 'COMBO';
+    return 'TEXT';
+  }
+
+  private static normalizeSurface(surface: any): 'user' | 'setting' | 'both' | 'system' {
+    if (surface === 'user' || surface === 'setting' || surface === 'both' || surface === 'system') return surface;
+    return 'setting';
   }
 
   /**
@@ -442,7 +560,7 @@ export class WorkflowParamService {
       if (param.type === 'IMAGE' && param.label.toLowerCase().includes('参考')) {
         const value = this.getSubmittedValue(submitted, param.id, param.widgetName);
         if (value) {
-          const found = uploadedFiles?.find((f: any) => f.id === value);
+          const found = this.findUploadedFile(uploadedFiles, value);
           return found?.id || value;
         }
       }

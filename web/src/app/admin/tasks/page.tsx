@@ -196,6 +196,24 @@ export default function TasksPage() {
       ),
     },
     {
+      title: '执行节点',
+      key: 'comfyuiNode',
+      width: 160,
+      render: (_: any, record: any) => {
+        const nodeName = record.comfyuiNode?.name || record.comfyuiNode?.id || '未分配';
+        const nodeUrl = record.comfyuiNode?.url;
+        return (
+          <Tooltip title={nodeUrl || nodeName}>
+            <Tag color={record.comfyuiNode ? 'geekblue' : 'default'} style={{ maxWidth: 150 }}>
+              <Text ellipsis style={{ maxWidth: 130, display: 'inline-block', verticalAlign: 'middle' }}>
+                {nodeName}
+              </Text>
+            </Tag>
+          </Tooltip>
+        );
+      },
+    },
+    {
       title: '提示词',
       dataIndex: 'prompt',
       key: 'prompt',
@@ -345,6 +363,11 @@ export default function TasksPage() {
               <Descriptions.Item label="任务 ID" span={2}>{selectedTask.id}</Descriptions.Item>
               <Descriptions.Item label="用户">{selectedTask.user?.username}</Descriptions.Item>
               <Descriptions.Item label="工作流">{selectedTask.workflow?.name}</Descriptions.Item>
+              <Descriptions.Item label="执行节点">
+                {selectedTask.comfyuiNode
+                  ? `${selectedTask.comfyuiNode.name || selectedTask.comfyuiNode.id}${selectedTask.comfyuiNode.url ? ` · ${selectedTask.comfyuiNode.url}` : ''}`
+                  : '-'}
+              </Descriptions.Item>
               <Descriptions.Item label="状态">{statusMap[selectedTask.status]?.text || selectedTask.status}</Descriptions.Item>
               <Descriptions.Item label="进度">{selectedTask.progress}%</Descriptions.Item>
               <Descriptions.Item label="消耗积分">{selectedTask.creditCost}</Descriptions.Item>

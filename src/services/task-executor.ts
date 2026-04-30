@@ -674,7 +674,7 @@ export class TaskExecutor {
 
       this.applyWorkflowParameters(apiWorkflow, task.workflow, parameters, task.prompt);
 
-      // 注入扁平格式的任意参数（格式： "nodeId.inputs.paramName": value）
+      // 注入扁平格式的任意参数（格式： "nodeId.paramName": value，兼容旧的 nodeId.inputs.paramName）
       // 测试接口使用此格式传递参数
       const flatParamCount = this.injectFlatParameters(apiWorkflow, parameters);
       if (flatParamCount > 0) {
@@ -794,8 +794,8 @@ export class TaskExecutor {
 
   /**
    * 从 task.parameters 中读取参数值，兼容：
-   * - nodeId.inputs.paramName
    * - nodeId.paramName
+   * - nodeId.inputs.paramName
    * - paramName
    */
   private getTaskParameter(parameters: Record<string, any>, nodeId: string | number | undefined, paramName: string): any {
@@ -804,8 +804,10 @@ export class TaskExecutor {
     const nodeKey = nodeId !== undefined && nodeId !== null ? String(nodeId) : '';
     const directKey = nodeKey ? `${nodeKey}.${paramName}` : '';
     const flatKey = nodeKey ? `${nodeKey}.inputs.${paramName}` : '';
+    const clientFlatKey = nodeKey ? `${nodeKey}.${paramName}` : '';
 
     if (flatKey && parameters[flatKey] !== undefined) return parameters[flatKey];
+    if (clientFlatKey && parameters[clientFlatKey] !== undefined) return parameters[clientFlatKey];
     if (directKey && parameters[directKey] !== undefined) return parameters[directKey];
     if (parameters[paramName] !== undefined) return parameters[paramName];
     return undefined;
@@ -1057,7 +1059,7 @@ export class TaskExecutor {
 
   /**
    * 注入扁平格式参数到 API 工作流
-   * 参数格式：{ "nodeId.inputs.paramName": value }
+   * 参数格式：{ "nodeId.paramName": value }，同时兼容旧的 nodeId.inputs.paramName
    * 用于测试接口传递任意节点参数
    */
   private injectFlatParameters(apiWorkflow: Record<string, any>, parameters: Record<string, any>): number {
@@ -1065,8 +1067,8 @@ export class TaskExecutor {
 
     let count = 0;
     for (const [flatKey, value] of Object.entries(parameters)) {
-      // 解析 "nodeId.inputs.paramName" 格式
-      const match = flatKey.match(/^(.+?)\.inputs\.(.+)$/);
+      // 解析 "nodeId.paramName" 或旧的 "nodeId.inputs.paramName" 格式
+      const match = flatKey.match(/^(.+?)\.(?:inputs\.)?(.+)$/);
       if (!match) continue;
 
       const [, nodeId, paramName] = match;

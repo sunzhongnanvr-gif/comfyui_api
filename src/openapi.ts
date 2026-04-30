@@ -35,28 +35,18 @@ const baseComponents = {
         enabled: { type: 'boolean' },
         creditCost: { type: 'integer' },
         timeout: { type: 'integer', nullable: true },
-        visible: { type: 'boolean' },
         canSubmit: { type: 'boolean' },
-        accessReason: { type: 'string' },
       },
     },
     WorkflowInputParam: {
       type: 'object',
       properties: {
-        id: { type: 'string', example: '27.inputs.text' },
-        nodeId: { type: 'string', example: '27' },
-        paramName: { type: 'string', example: 'text' },
-        paramType: { type: 'string', example: 'STRING' },
+        key: { type: 'string', example: '27.text' },
         label: { type: 'string', example: '提示词' },
+        inputType: { type: 'string', example: 'TEXT' },
         defaultValue: {},
         required: { type: 'boolean' },
-        active: { type: 'boolean' },
-        disabled: { type: 'boolean' },
-        seedMode: { type: 'string', nullable: true, example: 'random' },
-        nodeTitle: { type: 'string', nullable: true },
-        nodeType: { type: 'string', nullable: true },
-        parentNodeId: { type: 'string', nullable: true },
-        parentNodeTitle: { type: 'string', nullable: true },
+        surface: { type: 'string', enum: ['user', 'setting', 'both', 'system'] },
         placeholder: { type: 'string', nullable: true },
         min: { type: 'number', nullable: true },
         max: { type: 'number', nullable: true },
@@ -270,7 +260,7 @@ const sharedPaths: Record<string, any> = {
                           reason: { type: 'string' },
                         },
                       },
-                      params: {
+                      fields: {
                         type: 'array',
                         items: { $ref: '#/components/schemas/WorkflowInputParam' },
                       },
@@ -301,11 +291,11 @@ const sharedPaths: Record<string, any> = {
         required: true,
         content: {
           'application/json': {
-            schema: {
-              type: 'object',
-              additionalProperties: true,
-              description: '动态表单按 inputs 清单拼出来的键值对',
-            },
+              schema: {
+                type: 'object',
+                additionalProperties: true,
+                description: '动态表单按 fields 清单拼出来的平铺键值对',
+              },
           },
         },
       },
@@ -389,10 +379,10 @@ const sharedPaths: Record<string, any> = {
       responses: { 200: { description: '任务列表' } },
     },
   },
-  '/upload/comfyui-input': {
+  '/upload/input': {
     post: {
       tags: ['Files'],
-      summary: '上传图片/视频/音频到输入区',
+      summary: '上传输入文件',
       security: [{ bearerAuth: [] }],
       requestBody: {
         required: true,

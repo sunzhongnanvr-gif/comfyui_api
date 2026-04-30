@@ -101,7 +101,7 @@ export default function ApiManagementPage() {
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       const base = typeof window !== 'undefined' ? `http://${window.location.hostname}:3001/api/v1` : 'http://localhost:3001/api/v1';
 
-      const res = await fetch(`${base}/upload/comfyui-input`, {
+      const res = await fetch(`${base}/upload/input`, {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
@@ -110,7 +110,7 @@ export default function ApiManagementPage() {
       const data = await res.json();
 
       if (data.success) {
-        const filename = data.data.filename;
+        const filename = data.data.input_filename || data.data.filename;
         testForm.setFieldsValue({
           [nodeId]: {
             [paramName]: filename,

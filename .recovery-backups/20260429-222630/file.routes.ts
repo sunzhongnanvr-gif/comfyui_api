@@ -54,20 +54,18 @@ router.post('/', authenticate as any, upload.single('file'), async (req: AuthReq
       });
     }
 
-    const { getComfyUIUrl } = await import('../config/settings');
-    const comfyuiUrl = await getComfyUIUrl();
-    const uploadedFile = await FileUploadService.uploadAndRegister(req.user!.id, req.file, comfyuiUrl);
+    const uploadedFile = await FileUploadService.uploadAndRegister(req.user!.id, req.file);
     const relativePath = uploadedFile.storagePath;
 
     res.status(201).json({
       success: true,
       data: {
         file_id: uploadedFile.id,
-        filename: uploadedFile.originalName,
-        input_filename: uploadedFile.comfyuiFilename || uploadedFile.filename,
-        mime_type: uploadedFile.mimeType,
-        size_bytes: uploadedFile.fileSize,
+        filename: uploadedFile.filename,
         url: `/api/v1/files/uploads/${relativePath}`,
+        original_name: uploadedFile.originalName,
+        file_size: uploadedFile.fileSize,
+        input_filename: uploadedFile.comfyuiFilename || uploadedFile.filename,
       }
     });
   } catch (error: any) {
@@ -105,29 +103,23 @@ const inputUpload = multer({
   }
 });
 
-function buildUploadResponse(uploadedFile: any) {
-  return {
-    file_id: uploadedFile.id,
-    filename: uploadedFile.originalName,
-    input_filename: uploadedFile.comfyuiFilename || uploadedFile.filename,
-    mime_type: uploadedFile.mimeType,
-    size_bytes: uploadedFile.fileSize,
-  };
-}
-
 const handleInputUpload = async (req: AuthRequest, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, error: '请选择要上传的文件' });
     }
 
-    const { getComfyUIUrl } = await import('../config/settings');
-    const comfyuiUrl = await getComfyUIUrl();
-    const uploadedFile = await FileUploadService.uploadAndRegister(req.user!.id, req.file, comfyuiUrl);
+    const uploadedFile = await FileUploadService.uploadAndRegister(req.user!.id, req.file);
 
     res.json({
       success: true,
-      data: buildUploadResponse(uploadedFile)
+      data: {
+        file_id: uploadedFile.id,
+        input_filename: uploadedFile.comfyuiFilename || uploadedFile.filename,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        fileSize: req.file.size,
+      }
     });
   } catch (error: any) {
     if (error.code === 'LIMIT_FILE_SIZE') {

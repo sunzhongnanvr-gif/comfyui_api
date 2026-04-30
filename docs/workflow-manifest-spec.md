@@ -95,25 +95,23 @@ GET /api/v1/workflows/{slug}/inputs
   "data": {
     "workflowSlug": "生图快速",
     "workflowName": "文生图-ZImage",
-    "params": [
+    "fields": [
       {
-        "id": "57.inputs.text",
+        "key": "57.text",
         "label": "提示词",
-        "type": "TEXT",
+        "inputType": "TEXT",
         "required": true,
-        "visible": true,
-        "active": true,
-        "default": "",
+        "defaultValue": "",
+        "surface": "setting",
         "placeholder": "请输入提示词"
       },
       {
-        "id": "57.inputs.width",
+        "key": "57.width",
         "label": "宽度",
-        "type": "INT",
+        "inputType": "INT",
         "required": false,
-        "visible": true,
-        "active": true,
-        "default": 1024,
+        "defaultValue": 1024,
+        "surface": "setting",
         "min": 64,
         "max": 2048
       }
@@ -128,13 +126,12 @@ GET /api/v1/workflows/{slug}/inputs
 
 ### 5.1 基础字段
 
-- `id`：提交时使用的 key，必须唯一
+- `key`：提交时使用的 key，必须唯一
 - `label`：显示名
-- `type`：字段类型
+- `inputType`：字段类型
 - `required`：是否必填
-- `visible`：是否给客户端展示
-- `active`：是否参与提交
-- `default`：默认值
+- `defaultValue`：默认值
+- `surface`：出现位置
 
 ### 5.2 可选字段
 
@@ -175,14 +172,14 @@ GET /api/v1/workflows/{slug}/inputs
 
 ## 7. 提交流程
 
-客户端提交任务时，直接把 `params[]` 中的 `id` 作为 JSON key：
+客户端提交任务时，直接把 `fields[]` 中的 `key` 作为 JSON key：
 
 ```json
 {
-  "57.inputs.text": "一只在月球上喝咖啡的猫",
-  "57.inputs.width": 1024,
-  "57.inputs.height": 1024,
-  "57.inputs.steps": 5
+  "57.text": "一只在月球上喝咖啡的猫",
+  "57.width": 1024,
+  "57.height": 1024,
+  "57.steps": 5
 }
 ```
 
