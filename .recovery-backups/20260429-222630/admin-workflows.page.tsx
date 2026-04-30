@@ -44,7 +44,7 @@ type AccessConfigForm = {
   submitUserIds: string[];
 };
 
-type ParamSurface = 'user' | 'setting' | 'both' | 'system';
+type ParamSurface = 'user' | 'setting' | 'both';
 
 const DEFAULT_ACCESS_FORM: AccessConfigForm = {
   visible: true,
@@ -112,36 +112,32 @@ function buildAccessConfigPayload(values: AccessConfigForm) {
 }
 
 function normalizeParamSurface(value: any): ParamSurface {
-  if (value === 'setting' || value === 'both' || value === 'user' || value === 'system') return value;
-  return 'setting';
+  if (value === 'setting' || value === 'both' || value === 'user') return value;
+  return 'user';
 }
 
 function buildFieldConfigPayload(params: any[]) {
   const surfaces: Record<string, ParamSurface> = {};
-  const requireds: Record<string, boolean> = {};
   params.forEach((param: any, index: number) => {
     const key = String(param?.id || '').trim() || `param-${index}`;
     surfaces[key] = normalizeParamSurface(param?.surface);
-    requireds[key] = Boolean(param?.required);
   });
-  return { surfaces, requireds };
+  return { surfaces };
 }
 
 function applyFieldConfigToParams(params: any[], fieldConfig: any) {
   const surfaces = fieldConfig?.surfaces || {};
-  const requireds = fieldConfig?.requireds || {};
   return params.map((param: any, index: number) => {
     const key = String(param?.id || '').trim() || `param-${index}`;
     return {
       ...param,
       surface: normalizeParamSurface(surfaces[key]),
-      required: requireds[key] ?? param?.required ?? false,
     };
   });
 }
 
 function stripFieldConfigFromParams(params: any[]) {
-  return params.map(({ surface, required, ...rest }: any) => rest);
+  return params.map(({ surface, ...rest }: any) => rest);
 }
 
 function groupParamsByNode(params: any[]) {
@@ -175,21 +171,7 @@ function groupParamsByNode(params: any[]) {
     if (param?.active !== false) group.disabled = false;
   });
 
-  const mergedGroups = new Map<string, ParamGroupNode>();
-  for (const group of Array.from(groups.values())) {
-    const mergeKey = `${group.nodeId}::${group.title}`;
-    if (!mergedGroups.has(mergeKey)) {
-      mergedGroups.set(mergeKey, group);
-      continue;
-    }
-    const target = mergedGroups.get(mergeKey)!;
-    target.items.push(...group.items);
-    target.disabled = target.disabled && group.disabled;
-    if (!target.parentNodeId && group.parentNodeId) target.parentNodeId = group.parentNodeId;
-    if (!target.parentNodeTitle && group.parentNodeTitle) target.parentNodeTitle = group.parentNodeTitle;
-  }
-
-  const flatGroups = Array.from(mergedGroups.values());
+  const flatGroups = Array.from(groups.values());
   const roots = flatGroups.filter(group => group.items.some((item: any) => item.active !== false));
 
   const roleRank = (group: ParamGroupNode) => {
@@ -252,13 +234,6 @@ function groupParamsByChildNode(items: any[]) {
     return ai - bi;
   });
   return flatGroups;
-}
-
-function splitShellAndChildParams(items: any[], shellNodeId: string) {
-  const shellId = String(shellNodeId || '').trim();
-  const shellItems = items.filter((item: any) => String(item?.nodeId || '').trim() === shellId);
-  const childItems = items.filter((item: any) => String(item?.nodeId || '').trim() !== shellId);
-  return { shellItems, childItems };
 }
 
 function getGroupRole(group: { isSubgraph: boolean; items: any[]; disabled?: boolean }) {
@@ -1203,7 +1178,7 @@ export default function WorkflowsPage() {
       const data = await res.json();
 
       if (data.success) {
-        const filename = data.data.input_filename || data.data.filename;
+        const filename = data.data.filename;
         testForm.setFieldsValue({
           [nodeId]: {
             [paramName]: filename,
@@ -1833,11 +1808,11 @@ export default function WorkflowsPage() {
         <p style={{ color: '#666', marginBottom: 16 }}>
           已自动解析出 <b>{serverParsedParams.length}</b> 个参数。
           <br />
-        <Text type="secondary">勾选“可见”表示开放给用户；“激活/关闭”表示是否彻底跳过该参数；“位置”表示出现在用户页、设置页、两处或系统。</Text>
+          <Text type="secondary">勾选“可见”表示开放给用户；“激活/关闭”表示是否彻底跳过该参数；“位置”表示出现在用户页、设置页或两处。</Text>
         </p>
         <GroupedParamEditor
           params={serverParsedParams}
-          mode="full"
+          mode="simple"
           onParamsChange={setServerParsedParams}
         />
         <div style={{ marginTop: 16, display: 'flex' }}>
@@ -1878,14 +1853,14 @@ export default function WorkflowsPage() {
         <p style={{ color: '#666', marginBottom: 16 }}>
           共 <b>{editParamParams.length}</b> 个参数。
           <br />
-          <Text type="secondary">勾选“可见”表示开放给用户；“激活/关闭”表示是否彻底跳过该参数；“位置”表示出现在用户页、设置页、两处或系统。</Text>
+          <Text type="secondary">勾选“可见”表示开放给用户；“激活/关闭”表示是否彻底跳过该参数；“位置”表示出现在用户页、设置页或两处。</Text>
         </p>
         {editParamParams.length === 0 ? (
           <Alert message="未检测到参数" description="该工作流可能没有可配置的参数" type="info" showIcon />
         ) : (
           <GroupedParamEditor
             params={editParamParams}
-            mode="full"
+            mode="simple"
             onParamsChange={setEditParamParams}
           />
         )}
@@ -1966,15 +1941,14 @@ function GroupedParamEditor({
       );
     }
 
-    if (paramType === 'IMAGE' || paramType === 'VIDEO' || paramType === 'AUDIO') {
-      const mediaLabel = paramType === 'IMAGE' ? '图片' : paramType === 'VIDEO' ? '视频' : '音频';
+    if (paramType === 'IMAGE') {
       return (
         <Space size={4}>
           <Input
             size="small"
             style={{ width: 140 }}
             value={param?.default ?? ''}
-            placeholder={`${mediaLabel}文件名`}
+            placeholder="ComfyUI 文件名"
             onChange={e => updateParam(index, { default: e.target.value })}
           />
           <Upload
@@ -1986,7 +1960,7 @@ function GroupedParamEditor({
                 formData.append('file', file);
                 const base = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.1.100:3001/api/v1';
                 const token = localStorage.getItem('token');
-                const res = await fetch(`${base}/upload/input`, {
+                const res = await fetch(`${base}/user/files/upload`, {
                   method: 'POST',
                   headers: { 'Authorization': `Bearer ${token}` },
                   body: formData,
@@ -2004,7 +1978,7 @@ function GroupedParamEditor({
               return false;
             }}
           >
-              <Button size="small" icon={<UploadOutlined />}>上传</Button>
+            <Button size="small" icon={<UploadOutlined />}>上传</Button>
           </Upload>
         </Space>
       );
@@ -2056,7 +2030,7 @@ function GroupedParamEditor({
     {
       title: '可见',
       key: 'visible',
-      width: 56,
+      width: 30,
       render: (_: any, record: any) => (
         <Checkbox
           checked={record?.visible ?? true}
@@ -2064,17 +2038,6 @@ function GroupedParamEditor({
         />
       ),
     },
-    ...(mode === 'full' ? [{
-      title: '必填',
-      key: 'required',
-      width: 64,
-      render: (_: any, record: any) => (
-        <Checkbox
-          checked={record?.required ?? false}
-          onChange={e => updateParam(record.__index, { required: e.target.checked })}
-        />
-      ),
-    }] : []),
     {
       title: '位置',
       key: 'surface',
@@ -2082,18 +2045,28 @@ function GroupedParamEditor({
       render: (_: any, record: any) => (
         <Select
           size="small"
-          value={record?.surface || 'setting'}
+          value={record?.surface || 'user'}
           style={{ width: '100%' }}
           onChange={(value) => updateParam(record.__index, { surface: value })}
           options={[
             { value: 'user', label: '用户页' },
             { value: 'setting', label: '设置页' },
             { value: 'both', label: '两处' },
-            { value: 'system', label: '系统' },
           ]}
         />
       ),
     },
+    ...(mode === 'full' ? [{
+      title: '必填',
+      key: 'required',
+      width: 30,
+      render: (_: any, record: any) => (
+        <Checkbox
+          checked={record?.required ?? false}
+          onChange={e => updateParam(record.__index, { required: e.target.checked })}
+        />
+      ),
+    }] : []),
     {
       title: '参数名',
       dataIndex: 'id',
@@ -2155,7 +2128,7 @@ function GroupedParamEditor({
           {isDisabled && <Tag color="default" style={{ margin: 0 }}>已禁用</Tag>}
           {role.key === 'main' && depth === 0 && <Tag color="green" style={{ margin: 0 }}>优先显示</Tag>}
         </Space>
-        {childCount > 0 && depth === 0 && (
+        {childCount > 1 && depth === 0 && (
           <Button
             size="small"
             onClick={(e) => {
@@ -2173,27 +2146,11 @@ function GroupedParamEditor({
 
   const renderGroupContent = (group: ParamGroupNode, depth = 0, childMode = false) => {
     const isDisabled = group.disabled || group.items.every((item: any) => item.active === false);
-    const { shellItems, childItems } = splitShellAndChildParams(group.items, group.nodeId);
-    const childGroups = groupParamsByChildNode(childItems);
+    const childGroups = groupParamsByChildNode(group.items);
     return (
       <div style={{ paddingTop: 4 }}>
-        {shellItems.length > 0 && (
-          <Table
-            dataSource={shellItems}
-            columns={columns as any}
-            rowKey={(row: any) => String(row.__index)}
-            size="small"
-            pagination={false}
-            scroll={{ x: 1100 }}
-            onRow={(record: any) => ({
-              style: record?.active === false || isDisabled
-                ? { backgroundColor: '#fafafa', opacity: 0.55 }
-                : { backgroundColor: 'transparent' },
-            })}
-          />
-        )}
-        {childMode && childGroups.length > 0 ? (
-          <Collapse bordered={false} ghost defaultActiveKey={[]}>
+        {childMode && childGroups.length > 1 ? (
+          <Collapse bordered={false} ghost defaultActiveKey={childGroups.map(child => child.key)}>
             {childGroups.map((child) => {
               const childVisibleCount = child.items.filter((item: any) => item.visible !== false).length;
               const childActiveCount = child.items.filter((item: any) => item.active !== false).length;
@@ -2233,11 +2190,19 @@ function GroupedParamEditor({
             })}
           </Collapse>
         ) : (
-          childItems.length > 0 && (
-            <div style={{ marginTop: 8 }}>
-              <Text type="secondary" style={{ fontSize: 12 }}>子节点参数已折叠，点击上方“+ 子节点”展开。</Text>
-            </div>
-          )
+          <Table
+            dataSource={group.items}
+            columns={columns as any}
+            rowKey={(row: any) => String(row.__index)}
+            size="small"
+            pagination={false}
+            scroll={{ x: 1100 }}
+            onRow={(record: any) => ({
+              style: record?.active === false || isDisabled
+                ? { backgroundColor: '#fafafa', opacity: 0.55 }
+                : { backgroundColor: 'transparent' },
+            })}
+          />
         )}
       </div>
     );

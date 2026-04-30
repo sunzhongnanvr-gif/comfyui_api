@@ -6,6 +6,7 @@ import { WorkflowParamService } from '../services/workflow-param-service';
 import { WorkflowManifestService } from '../services/workflow-manifest-service';
 import { TaskResourceService } from '../services/task-resource-service';
 import { parseWorkflowParams, mergeParamsWithConfig } from '../utils/workflow-parser';
+import { deriveLiveTaskProgress, deriveQueuePositionHint } from '../utils/task-progress';
 
 const router = Router();
 
@@ -213,7 +214,7 @@ router.post('/:workflowSlug', authenticate as any, upload.any() as any, async (r
         status: task.status,
         queue_position: queuePosition,
         credit_cost: isTestMode ? 0 : workflow.creditCost,
-        estimated_time: workflow.type === 'video' ? 180 : 30,
+        estimated_time: workflow.type === 'video' ? 300 : 30,
       }
     });
   } catch (error) {
@@ -253,7 +254,7 @@ router.get('/:taskId', authenticate as any, async (req: AuthRequest, res: Respon
       task_id: task.id,
       type: task.workflow.type,
       status: task.status,
-      progress: task.progress,
+      progress: deriveLiveTaskProgress({ ...task, workflow: task.workflow }),
       created_at: task.createdAt,
       updated_at: task.updatedAt,
     };
@@ -263,6 +264,7 @@ router.get('/:taskId', authenticate as any, async (req: AuthRequest, res: Respon
         where: { status: 'queued', createdAt: { lt: task.createdAt } }
       });
       response.queue_position = queuePosition + 1;
+      response.queue_hint = deriveQueuePositionHint(queuePosition);
     }
 
     if (task.status === 'completed') {
@@ -321,6 +323,7 @@ router.get('/', authenticate as any, async (req: AuthRequest, res: Response) => 
 
     const result = tasks.map(t => ({
       ...t,
+      progress: deriveLiveTaskProgress({ ...t, workflow: t.workflow }),
       result_urls: JSON.parse(t.resultUrls),
     }));
 

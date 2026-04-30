@@ -444,7 +444,7 @@ export class WorkflowParamService {
           const found = this.findUploadedFile(uploadedFiles, value);
           if (found) {
             const flatKey = this.paramIdToFlatKey(paramId);
-            result[flatKey] = found.comfyuiFilename;
+            result[flatKey] = found.comfyuiFilename || value;
           } else {
             const flatKey = this.paramIdToFlatKey(paramId);
             result[flatKey] = value;

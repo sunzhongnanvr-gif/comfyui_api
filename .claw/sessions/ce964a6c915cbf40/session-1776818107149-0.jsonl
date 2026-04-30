@@ -1,0 +1,4 @@
+{"created_at_ms":1776818107148,"model":"openai/Qwen3.6-35B-A3B-4bit","session_id":"session-1776818107149-0","type":"session_meta","updated_at_ms":1776818112205,"version":1,"workspace_root":"/Users/myagent/dockers/comfyui-api"}
+{"text":"你好","timestamp_ms":1776818110500,"type":"prompt_history"}
+{"message":{"blocks":[{"text":"你好","type":"text"}],"role":"user"},"type":"message"}
+{"message":{"blocks":[{"text":"你好！有什么我可以帮你的吗？\n\n我可以帮你：\n- 代码编辑和调试\n- 文件操作和搜索\n- 运行测试或命令\n- 任何软件开发的任务\n\n请告诉我你需要什么帮助！","type":"text"}],"role":"assistant","usage":{"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"input_tokens":5407,"output_tokens":47}},"type":"message"}

@@ -207,7 +207,7 @@ const handleWorkflowInputs = async (req: AuthRequest, res: Response) => {
         workflowName: workflow.name,
         workflowSlug: workflow.slug,
         creditCost: workflow.creditCost,
-        estimatedTime: workflow.type === 'video' ? 180 : 30,
+        estimatedTime: workflow.type === 'video' ? 300 : 30,
         access,
         fields,
       }

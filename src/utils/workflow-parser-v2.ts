@@ -272,6 +272,7 @@ function addShellInputParams(subgraph: any, shellNode: any, params: WorkflowPara
       nodeTitle: shellNodeTitle || getNodeTitle(shellNode, shellNode.type),
       nodeType: shellNode.type,
       required: inputDef?.required !== undefined ? Boolean(inputDef.required) : inputDef?.optional === true ? false : undefined,
+      isShellInput: true,
     });
   }
 }

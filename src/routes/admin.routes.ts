@@ -10,6 +10,7 @@ import { execSync } from 'child_process';
 import { parseWorkflowParams, parseWorkflowParamsAsync } from '../utils/workflow-parser';
 import { WorkflowParamService } from '../services/workflow-param-service';
 import { TaskResourceService } from '../services/task-resource-service';
+import { deriveLiveTaskProgress, deriveQueuePositionHint } from '../utils/task-progress';
 
 const router = Router();
 
@@ -2338,10 +2339,22 @@ router.get('/tasks', async (req: AuthRequest, res: Response) => {
       prisma.task.count({ where })
     ]);
 
+    const liveTasks = tasks.map(task => ({
+      ...task,
+      progress: deriveLiveTaskProgress({ ...task, workflow: task.workflow }),
+      queue_position: task.status === 'queued' ? null : undefined,
+    }));
+
+    const queuedTasks = liveTasks.filter(task => task.status === 'queued');
+    queuedTasks.forEach((task, index) => {
+      (task as any).queue_position = index + 1;
+      (task as any).queue_hint = deriveQueuePositionHint(index);
+    });
+
     res.json({
       success: true,
       data: {
-        tasks,
+        tasks: liveTasks,
         pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
       }
     });
@@ -2388,7 +2401,23 @@ router.get('/tasks/:id', async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ success: false, error: '任务不存在' });
     }
 
-    res.json({ success: true, data: task });
+    res.json({
+      success: true,
+      data: {
+        ...task,
+        progress: deriveLiveTaskProgress({ ...task, workflow: task.workflow }),
+        queue_position: task.status === 'queued'
+          ? (await prisma.task.count({
+              where: { status: 'queued', createdAt: { lt: task.createdAt } }
+            })) + 1
+          : null,
+        queue_hint: task.status === 'queued'
+          ? deriveQueuePositionHint(await prisma.task.count({
+              where: { status: 'queued', createdAt: { lt: task.createdAt } }
+            }))
+          : null,
+      }
+    });
   } catch (error) {
     return res.status(500).json({ success: false, error: '删除失败: ' + (error as any).message });
   }

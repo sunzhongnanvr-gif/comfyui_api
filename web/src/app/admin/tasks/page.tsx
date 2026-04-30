@@ -38,8 +38,7 @@ function parseResultUrls(resultUrls: any): string[] {
 
 function normalizeTask(task: any) {
   const resultUrls = parseResultUrls(task.resultUrls);
-  const hasOutputs = resultUrls.length > 0 || (Array.isArray(task.mediaOutputs) && task.mediaOutputs.length > 0);
-  const status = task.status === 'processing' && hasOutputs ? 'completed' : task.status;
+  const status = task.status;
   const progress = status === 'completed' ? 100 : Number(task.progress || 0);
   return {
     ...task,
@@ -65,6 +64,10 @@ export default function TasksPage() {
   useEffect(() => {
     loadTasks();
     loadStats();
+    const timer = setInterval(() => {
+      loadTasks();
+    }, 5000);
+    return () => clearInterval(timer);
   }, [page, statusFilter]);
 
   const loadTasks = async () => {
@@ -202,13 +205,22 @@ export default function TasksPage() {
       render: (_: any, record: any) => {
         const nodeName = record.comfyuiNode?.name || record.comfyuiNode?.id || '未分配';
         const nodeUrl = record.comfyuiNode?.url;
+        const nodeStatus = record.comfyuiNode?.status || 'unknown';
+        const nodeColor = nodeStatus === 'online' ? 'green' : nodeStatus === 'offline' ? 'red' : 'blue';
         return (
           <Tooltip title={nodeUrl || nodeName}>
-            <Tag color={record.comfyuiNode ? 'geekblue' : 'default'} style={{ maxWidth: 150 }}>
-              <Text ellipsis style={{ maxWidth: 130, display: 'inline-block', verticalAlign: 'middle' }}>
-                {nodeName}
-              </Text>
-            </Tag>
+            <Space direction="vertical" size={0}>
+              <Tag color={record.comfyuiNode ? 'geekblue' : 'default'} style={{ maxWidth: 150 }}>
+                <Text ellipsis style={{ maxWidth: 130, display: 'inline-block', verticalAlign: 'middle' }}>
+                  {nodeName}
+                </Text>
+              </Tag>
+              {record.comfyuiNode && (
+                <Tag color={nodeColor} style={{ marginTop: -4 }}>
+                  {nodeStatus === 'online' ? '在线' : nodeStatus === 'offline' ? '离线' : '未知'}
+                </Tag>
+              )}
+            </Space>
           </Tooltip>
         );
       },
@@ -241,12 +253,26 @@ export default function TasksPage() {
       dataIndex: 'progress',
       key: 'progress',
       width: 100,
-      render: (progress: number, record: any) => (
-        record.status === 'processing' ? <Progress percent={progress} size="small" /> :
-        record.status === 'completed' ? <Tag color="success">100%</Tag> :
-        record.status === 'failed' ? <Tag color="error">失败</Tag> :
-        <Text type="secondary">等待中</Text>
-      ),
+      render: (progress: number, record: any) => {
+        const createdAt = new Date(record.createdAt).getTime();
+        const updatedAt = new Date(record.updatedAt || record.createdAt).getTime();
+        const runningSeconds = Math.max(0, Math.floor((Date.now() - updatedAt) / 1000));
+        return (
+          <Space direction="vertical" size={0} style={{ width: '100%' }}>
+            {record.status === 'processing' ? <Progress percent={progress} size="small" /> :
+             record.status === 'completed' ? <Tag color="success">100%</Tag> :
+             record.status === 'failed' ? <Tag color="error">失败</Tag> :
+             <Tag color="default">排队中</Tag>}
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {record.status === 'queued' && record.queue_hint
+                ? record.queue_hint
+                : record.status === 'processing'
+                  ? `已运行 ${runningSeconds} 秒`
+                  : ''}
+            </Text>
+          </Space>
+        );
+      },
     },
     {
       title: '消耗积分',
@@ -368,8 +394,18 @@ export default function TasksPage() {
                   ? `${selectedTask.comfyuiNode.name || selectedTask.comfyuiNode.id}${selectedTask.comfyuiNode.url ? ` · ${selectedTask.comfyuiNode.url}` : ''}`
                   : '-'}
               </Descriptions.Item>
+              <Descriptions.Item label="节点状态">
+                {selectedTask.comfyuiNode?.status
+                  ? (selectedTask.comfyuiNode.status === 'online'
+                    ? '在线'
+                    : selectedTask.comfyuiNode.status === 'offline'
+                      ? '离线'
+                      : '未知')
+                  : '-'}
+              </Descriptions.Item>
               <Descriptions.Item label="状态">{statusMap[selectedTask.status]?.text || selectedTask.status}</Descriptions.Item>
               <Descriptions.Item label="进度">{selectedTask.progress}%</Descriptions.Item>
+              <Descriptions.Item label="排队位置">{selectedTask.queue_hint || selectedTask.queue_position ? selectedTask.queue_hint || `第 ${selectedTask.queue_position} 位` : '-'}</Descriptions.Item>
               <Descriptions.Item label="消耗积分">{selectedTask.creditCost}</Descriptions.Item>
               <Descriptions.Item label="创建时间">{new Date(selectedTask.createdAt).toLocaleString('zh-CN')}</Descriptions.Item>
               <Descriptions.Item label="更新时间">{selectedTask.updatedAt ? new Date(selectedTask.updatedAt).toLocaleString('zh-CN') : '-'}</Descriptions.Item>

@@ -26,6 +26,7 @@ export interface WorkflowParam {
   required?: boolean;
   comboOptions?: string[];
   placeholder?: string;
+  isShellInput?: boolean;
 }
 
 /**

@@ -1,0 +1,3 @@
+{"created_at_ms":1776787509005,"model":"openai/Qwen3.6-35B-A3B-4bit","session_id":"session-1776787509006-0","type":"session_meta","updated_at_ms":1776787509005,"version":1,"workspace_root":"/Users/myagent/dockers/comfyui-api"}
+{"text":"?","timestamp_ms":1776787512845,"type":"prompt_history"}
+{"message":{"blocks":[{"text":"?","type":"text"}],"role":"user"},"type":"message"}

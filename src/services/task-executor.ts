@@ -12,6 +12,7 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { getComfyUIUrl } from '../config/settings';
+import { FileUploadService } from './file-upload-service';
 interface ComfyUINode {
   id: string;
   name: string;
@@ -142,8 +143,13 @@ export class TaskExecutor {
 
       try {
         const resp = await axios.get(`${node.url}/history/${task.comfyPromptId}`, { timeout: 5000 });
-        if (resp.data[task.comfyPromptId]) {
-          await this.handleTaskCompleted(task.id, resp.data[task.comfyPromptId], task.userId, node);
+        const historyEntry = resp.data[task.comfyPromptId];
+        if (historyEntry) {
+          if (this.isSuccessfulHistoryEntry(historyEntry)) {
+            await this.handleTaskCompleted(task.id, historyEntry, task.userId, node);
+          } else {
+            await this.markTaskFailed(task.id, this.describeHistoryFailure(historyEntry));
+          }
         } else {
           await this.resetTaskToQueued(task.id);
         }
@@ -210,7 +216,7 @@ export class TaskExecutor {
     
     try {
       // 构建工作流
-      const workflow = await this.buildWorkflow(task);
+      const workflow = await this.buildWorkflow(task, node);
 
       // 提交到 ComfyUI
       const resp = await axios.post(`${node.url}/prompt`, {
@@ -273,7 +279,11 @@ export class TaskExecutor {
         for (const task of nodeTasks) {
           const taskHist = history[task.comfyPromptId!];
           if (taskHist) {
-            await this.handleTaskCompleted(task.id, taskHist, task.userId, node);
+            if (this.isSuccessfulHistoryEntry(taskHist)) {
+              await this.handleTaskCompleted(task.id, taskHist, task.userId, node);
+            } else {
+              await this.markTaskFailed(task.id, this.describeHistoryFailure(taskHist));
+            }
           }
         }
       } catch (e) {
@@ -645,26 +655,67 @@ export class TaskExecutor {
     }
   }
 
-  private async buildWorkflow(task: any): Promise<any> {
+  private async resolveTaskFilesForNode(task: any, node: ComfyUINode): Promise<{ parameters: Record<string, any>; referenceComfyuiFilename: string | null }> {
     const parameters = task.parameters ? JSON.parse(task.parameters) : {};
+    const resolvedParameters: Record<string, any> = { ...parameters };
+    const workflowParams = task.workflow?.parameters ? JSON.parse(task.workflow.parameters) : [];
+
+    const resolveUploadedFile = async (value: any): Promise<string | null> => {
+      if (value === undefined || value === null || value === '') return null;
+      const raw = String(value);
+      const file = await prisma.uploadedFile.findFirst({
+        where: {
+          userId: task.userId,
+          OR: [
+            { id: raw },
+            { comfyuiFilename: raw },
+            { filename: raw },
+            { originalName: raw },
+          ],
+        },
+      });
+      if (!file) return null;
+      const comfyuiFilename = (file as any).comfyuiFilename || await FileUploadService.syncRegisteredFileToComfyUI(file as any, node.url);
+      return comfyuiFilename || null;
+    };
+
+    for (const def of Array.isArray(workflowParams) ? workflowParams : []) {
+      const defId = String(def?.id || def?.key || '');
+      const nodeId = String(def?.nodeId || (defId.includes('.') ? defId.split('.')[0] : ''));
+      const paramName = String(def?.widgetName || (defId.includes('.') ? defId.split('.').slice(1).join('.') : defId));
+      if (!nodeId || !paramName) continue;
+      if (!['IMAGE', 'VIDEO', 'AUDIO'].includes(String(def?.type || '').toUpperCase())) continue;
+
+      const currentValue = this.getTaskParameter(resolvedParameters, nodeId, paramName);
+      if (currentValue === undefined || currentValue === null || currentValue === '') continue;
+      const comfyuiFilename = await resolveUploadedFile(currentValue);
+      if (comfyuiFilename) {
+        const flatKey = this.getTaskParameterFlatKey(nodeId, paramName);
+        resolvedParameters[flatKey] = comfyuiFilename;
+      }
+    }
+
+    let referenceComfyuiFilename: string | null = null;
+    if (task.referenceImgId) {
+      referenceComfyuiFilename = await resolveUploadedFile(task.referenceImgId);
+    }
+
+    return { parameters: resolvedParameters, referenceComfyuiFilename };
+  }
+
+  private getTaskParameterFlatKey(nodeId: string, paramName: string): string {
+    return `${nodeId}.${paramName}`;
+  }
+
+  private async buildWorkflow(task: any, node: ComfyUINode): Promise<any> {
+    const { parameters, referenceComfyuiFilename } = await this.resolveTaskFilesForNode(task, node);
     const promptParamIds = this.getPromptParamIds(task.workflow);
 
-    // 获取 ComfyUI 图片文件名（用于图生图）
-    let comfyuiImageFile: string | null = null;
-    if (task.referenceImgId) {
-      try {
-        const uploadedFile = await prisma.uploadedFile.findUnique({
-          where: { id: task.referenceImgId }
-        } as any);
-        comfyuiImageFile = (uploadedFile as any)?.comfyuiFilename || null;
-        if (comfyuiImageFile) {
-          console.log(`🖼️ 图生图模式，使用 ComfyUI 图片: ${comfyuiImageFile}`);
-        } else {
-          console.warn('⚠️ 任务关联了参考图，但未找到 ComfyUI 文件名');
-        }
-      } catch (e: any) {
-        console.warn('⚠️ 查询参考图失败:', e.message);
-      }
+    const comfyuiImageFile = referenceComfyuiFilename;
+    if (comfyuiImageFile) {
+      console.log(`🖼️ 图生图模式，使用 ComfyUI 图片: ${comfyuiImageFile}`);
+    } else if (task.referenceImgId) {
+      console.warn('⚠️ 任务关联了参考图，但未找到 ComfyUI 文件名');
     }
 
     // 优先使用预转换的 API 格式工作流
@@ -1118,6 +1169,41 @@ export class TaskExecutor {
     } catch (error: any) {
       await this.markTaskFailed(taskId, `结果处理失败：${error.message}`);
     }
+  }
+
+  private isSuccessfulHistoryEntry(history: any): boolean {
+    if (!history) return false;
+
+    const status = String(history.status || history._meta?.status || '').toLowerCase();
+    if (['error', 'execution_error', 'cancelled', 'canceled', 'failed'].includes(status)) {
+      return false;
+    }
+
+    const nodeErrors = history.outputs?._meta?.node_errors;
+    if (nodeErrors && Object.keys(nodeErrors).length > 0) {
+      return false;
+    }
+
+    const outputs = history.outputs || {};
+    for (const [nodeId, nodeOutput] of Object.entries(outputs) as [string, any][]) {
+      if (nodeId === '_meta') continue;
+      if (nodeOutput?.images?.length || nodeOutput?.videos?.length || nodeOutput?.gifs?.length) {
+        return true;
+      }
+    }
+
+    return status === 'completed' || status === 'success';
+  }
+
+  private describeHistoryFailure(history: any): string {
+    const status = String(history?.status || history?._meta?.status || '').toLowerCase();
+    if (['cancelled', 'canceled'].includes(status)) return '任务已取消';
+    if (['error', 'execution_error', 'failed'].includes(status)) return '任务执行失败';
+    const nodeErrors = history?.outputs?._meta?.node_errors;
+    if (nodeErrors && Object.keys(nodeErrors).length > 0) {
+      return '任务执行失败';
+    }
+    return '任务执行失败';
   }
 
   private parseOutputs(history: any): string[] {
