@@ -1,2 +1,0 @@
-{"created_at_ms":1776699864719,"model":"openai/gemma-4-26b-a4b-it-heretic","session_id":"session-1776699864720-0","type":"session_meta","updated_at_ms":1776699864719,"version":1,"workspace_root":"/Users/myagent/dockers/comfyui-api"}
-{"message":{"blocks":[{"text":"帮我检查项目代码给个审计报告","type":"text"}],"role":"user"},"type":"message"}

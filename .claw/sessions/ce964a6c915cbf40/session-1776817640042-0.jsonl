@@ -1,3 +1,0 @@
-{"created_at_ms":1776817640041,"model":"openai/qwen3.6-plus","session_id":"session-1776817640042-0","type":"session_meta","updated_at_ms":1776817640041,"version":1,"workspace_root":"/Users/myagent/dockers/comfyui-api"}
-{"text":"你好","timestamp_ms":1776817642751,"type":"prompt_history"}
-{"message":{"blocks":[{"text":"你好","type":"text"}],"role":"user"},"type":"message"}

@@ -1,2 +1,0 @@
-{"created_at_ms":1776699585690,"model":"openai/qwen3.6-plus","session_id":"session-1776699585691-0","type":"session_meta","updated_at_ms":1776699585690,"version":1,"workspace_root":"/Users/myagent/dockers/comfyui-api"}
-{"message":{"blocks":[{"text":"回复你好","type":"text"}],"role":"user"},"type":"message"}

@@ -1,2 +1,0 @@
-{"created_at_ms":1776699880879,"model":"openai/gemma-4-26b-a4b-it-heretic","session_id":"session-1776699880880-0","type":"session_meta","updated_at_ms":1776699880879,"version":1,"workspace_root":"/Users/myagent/dockers/comfyui-api"}
-{"message":{"blocks":[{"text":"帮我改个bug","type":"text"}],"role":"user"},"type":"message"}
