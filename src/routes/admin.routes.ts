@@ -2423,6 +2423,85 @@ router.get('/tasks/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// 导出任务详情（从 GPU 节点拉取最终 history）
+router.get('/tasks/:id/export', async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const task = await prisma.task.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        status: true,
+        progress: true,
+        prompt: true,
+        parameters: true,
+        creditCost: true,
+        resultUrls: true,
+        createdAt: true,
+        updatedAt: true,
+        comfyPromptId: true,
+        user: { select: { id: true, username: true, realName: true } },
+        workflow: { select: { id: true, name: true, slug: true, type: true } },
+        comfyuiNode: { select: { id: true, url: true, name: true } },
+      }
+    });
+
+    if (!task) {
+      return res.status(404).json({ success: false, error: '任务不存在' });
+    }
+
+    if (!task.comfyPromptId || !task.comfyuiNode?.url) {
+      return res.status(400).json({ success: false, error: '该任务没有可导出的 GPU 提交记录' });
+    }
+
+    const historyResp = await axios.get(`${task.comfyuiNode.url}/history/${task.comfyPromptId}`, { timeout: 15000 });
+    const history = historyResp.data?.[task.comfyPromptId] ?? null;
+    const nodeErrors = history?.outputs?._meta?.node_errors || null;
+    const historyStatus = history?.status?.status_str || history?.status || null;
+    const historyMessages = Array.isArray(history?.status?.messages) ? history.status.messages : [];
+    const promptPayload = history?.prompt || null;
+
+    const exported = {
+      exportedAt: new Date().toISOString(),
+      task,
+      gpu: {
+        promptId: task.comfyPromptId,
+        node: task.comfyuiNode,
+        history,
+      },
+      errorReport: {
+        summary: task.status === 'failed'
+          ? '任务在中转站或 GPU 执行链路中失败。请结合 gpu.history、node_errors、task.error 继续定位。'
+          : '任务当前不是失败状态，仅供排查参考。',
+        taskStatus: task.status,
+        taskError: null,
+        taskParameters: task.parameters ? JSON.parse(task.parameters) : null,
+        historyStatus,
+        nodeErrors,
+        historyMessages,
+        promptPayload,
+        notes: [
+          'JSON 不支持真正的尾部注释，因此这里用 errorReport 字段保存排查说明。',
+          '如果 historyStatus 不是 success，优先看 nodeErrors 和 historyMessages。',
+          '如果 historyStatus 是 success 但任务仍失败，说明中转站后处理链路需要继续检查。',
+        ],
+      },
+    };
+
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    const rawName = `${task.workflow?.name || task.workflow?.slug || 'task'}-${task.createdAt.toISOString().replace(/[:.]/g, '-')}-${task.id}.json`;
+    const asciiName = rawName.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');
+    const encodedName = encodeURIComponent(rawName);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${asciiName}"; filename*=UTF-8''${encodedName}`,
+    );
+    return res.status(200).send(JSON.stringify(exported, null, 2));
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: '导出失败: ' + (error?.message || 'unknown error') });
+  }
+});
+
 // 删除任务
 router.delete('/tasks/:id', async (req: AuthRequest, res: Response) => {
   try {

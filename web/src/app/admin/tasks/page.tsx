@@ -10,7 +10,7 @@ import {
   ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined,
   SyncOutlined, PauseCircleOutlined
 } from '@ant-design/icons';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, getApiBase } from '@/lib/api';
 
 const { Text } = Typography;
 
@@ -102,6 +102,42 @@ export default function TasksPage() {
       const data = await apiFetch(`/admin/tasks/${task.id}`);
       if (data.success) setSelectedTask(normalizeTask(data.data));
     } catch (error) {}
+  };
+
+  const exportTaskDetail = async (task: any) => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const res = await fetch(`${getApiBase()}/admin/tasks/${task.id}/export`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        try {
+          const data = JSON.parse(text);
+          throw new Error(data.error || `导出失败: ${res.status}`);
+        } catch {
+          throw new Error(text || `导出失败: ${res.status}`);
+        }
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const createdAt = task.createdAt ? new Date(task.createdAt) : new Date();
+      const stamp = createdAt.toISOString().replace(/[:.]/g, '-');
+      a.download = `${task.workflow?.slug || 'task'}-${stamp}-${task.id}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      message.success('已开始导出');
+    } catch (error: any) {
+      message.error(error.message || '导出失败');
+    }
   };
 
   const retryTask = async (task: any) => {
@@ -408,9 +444,13 @@ export default function TasksPage() {
               <Descriptions.Item label="排队位置">{selectedTask.queue_hint || selectedTask.queue_position ? selectedTask.queue_hint || `第 ${selectedTask.queue_position} 位` : '-'}</Descriptions.Item>
               <Descriptions.Item label="消耗积分">{selectedTask.creditCost}</Descriptions.Item>
               <Descriptions.Item label="创建时间">{new Date(selectedTask.createdAt).toLocaleString('zh-CN')}</Descriptions.Item>
-              <Descriptions.Item label="更新时间">{selectedTask.updatedAt ? new Date(selectedTask.updatedAt).toLocaleString('zh-CN') : '-'}</Descriptions.Item>
-              <Descriptions.Item label="耗时">计算中...</Descriptions.Item>
-            </Descriptions>
+            <Descriptions.Item label="更新时间">{selectedTask.updatedAt ? new Date(selectedTask.updatedAt).toLocaleString('zh-CN') : '-'}</Descriptions.Item>
+            <Descriptions.Item label="耗时">计算中...</Descriptions.Item>
+          </Descriptions>
+
+          <div style={{ marginTop: 16 }}>
+            <Button onClick={() => exportTaskDetail(selectedTask)}>导出详情</Button>
+          </div>
 
             <div style={{ marginTop: 16 }}>
               <Text strong>提示词：</Text>

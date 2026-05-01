@@ -62,12 +62,7 @@ router.post('/', authenticate as any, upload.single('file'), async (req: AuthReq
     res.status(201).json({
       success: true,
       data: {
-        file_id: uploadedFile.id,
-        filename: uploadedFile.originalName,
-        input_filename: uploadedFile.comfyuiFilename || uploadedFile.filename,
-        mime_type: uploadedFile.mimeType,
-        size_bytes: uploadedFile.fileSize,
-        url: `/api/v1/files/uploads/${relativePath}`,
+        input_filename: uploadedFile.filename,
       }
     });
   } catch (error: any) {
@@ -107,11 +102,7 @@ const inputUpload = multer({
 
 function buildUploadResponse(uploadedFile: any) {
   return {
-    file_id: uploadedFile.id,
-    filename: uploadedFile.originalName,
-    input_filename: uploadedFile.comfyuiFilename || uploadedFile.filename,
-    mime_type: uploadedFile.mimeType,
-    size_bytes: uploadedFile.fileSize,
+    input_filename: uploadedFile.filename,
   };
 }
 

@@ -96,7 +96,6 @@ export class FileUploadService {
   static async syncRegisteredFileToComfyUI(
     uploadedFile: {
       id: string;
-      originalName: string;
       filename: string;
       mimeType: string;
       storagePath: string;
@@ -117,7 +116,7 @@ export class FileUploadService {
     const uploadBuffer = fs.readFileSync(filePath);
     const formData = new FormData();
     formData.append('image', uploadBuffer, {
-      filename: toSafeComfyFilename(uploadedFile.originalName || uploadedFile.filename),
+      filename: uploadedFile.filename,
       contentType: uploadedFile.mimeType || 'application/octet-stream',
     });
 
@@ -126,7 +125,7 @@ export class FileUploadService {
       timeout: 60000,
     });
 
-    const comfyuiFilename = response.data.name || toSafeComfyFilename(uploadedFile.originalName || uploadedFile.filename);
+    const comfyuiFilename = response.data.name || uploadedFile.filename;
 
     await prisma.uploadedFile.update({
       where: { id: uploadedFile.id },
