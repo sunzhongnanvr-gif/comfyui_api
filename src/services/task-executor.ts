@@ -385,18 +385,6 @@ export class TaskExecutor {
     return result;
   }
 
-  // 备用 widget key 映射（当 object_info 不完整时使用）
-  // 某些自定义节点（如 VideoHelperSuite）的 object_info 可能缺少隐藏 widget
-  private readonly FALLBACK_WIDGET_KEYS: Record<string, string[]> = {
-    'LoadVideo': ['file'], // wv[1..] 是 upload/force_rate 等 UI 参数，API 不需要
-    'SaveVideo': ['filename_prefix', 'format', 'codec'], // wv[1,3,4] 是 fps/quality/crf 隐藏值
-  };
-  // 有隐藏 widget（不在 object_info 中但在 widgets_values 中）的节点类型
-  private readonly HIDDEN_WIDGET_COUNT: Record<string, number> = {
-    'LoadVideo': 4,  // upload, force_rate, force_size, custom_width/height
-    'SaveVideo': 2,  // fps, quality (在 format/codec 之后)
-  };
-
   private getWidgetKeys(nodeInfo: any, nodeType: string, widgetsLength: number): { keys: string[]; hasCAG: Set<string> } {
     const keys: string[] = [];
     const hasCAG = new Set<string>();
@@ -414,13 +402,6 @@ export class TaskExecutor {
           }
         }
       }
-    }
-
-    // 如果 object_info 的 key 数量远少于 widgets_values，说明有隐藏 widget
-    // 使用备用映射
-    const fallback = this.FALLBACK_WIDGET_KEYS[nodeType];
-    if (fallback && fallback.length < widgetsLength) {
-      return { keys: fallback, hasCAG };
     }
 
     return { keys, hasCAG };
@@ -1031,10 +1012,9 @@ export class TaskExecutor {
 
       const exactNode = apiWorkflow[nodeId];
 
-      if (paramName === 'value' || paramName === 'widget_0') {
+      if (paramName === 'value') {
         if (exactNode?.inputs) {
           exactNode.inputs.value = prompt;
-          exactNode.inputs.widget_0 = prompt;
           targetNodeIds.add(nodeId);
         }
       }
@@ -1062,10 +1042,6 @@ export class TaskExecutor {
           node.inputs.value = prompt;
           targetNodeIds.add(apiNodeId);
         }
-        if (node.inputs.widget_0 !== undefined) {
-          node.inputs.widget_0 = prompt;
-          targetNodeIds.add(apiNodeId);
-        }
         if (node.inputs.text !== undefined) {
           node.inputs.text = prompt;
           targetNodeIds.add(apiNodeId);
@@ -1083,10 +1059,6 @@ export class TaskExecutor {
         if (!node?.inputs) continue;
         if (node.inputs.value !== undefined) {
           node.inputs.value = prompt;
-          targetNodeIds.add(nodeId);
-        }
-        if (node.inputs.widget_0 !== undefined) {
-          node.inputs.widget_0 = prompt;
           targetNodeIds.add(nodeId);
         }
         if (node.inputs.text !== undefined) {

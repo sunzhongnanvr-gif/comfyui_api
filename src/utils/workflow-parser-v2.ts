@@ -23,7 +23,9 @@ const WIDGET_INDEX_MAP: Record<string, Record<string, number>> = {
   'EmptyLatentImage': { width: 0, height: 1, batch_size: 2 },
   'EmptySD3LatentImage': { width: 0, height: 1, batch_size: 2 },
   'LoadImage': { image: 0 },
+  'LoadAudio': { audio: 0 },
   'SaveImage': { filename_prefix: 0 },
+  'SaveVideo': { filename_prefix: 0, format: 1, codec: 2 },
   'VHS_SaveVideo': { filename_prefix: 0, fps: 1, quality: 2, codec: 3 },
   'PreviewImage': {},
   'VAELoader': { vae_name: 0 },
@@ -44,7 +46,7 @@ const MODEL_LOADER_TYPES = new Set([
 
 /** 输出节点类型（需要暴露 filename 等参数） */
 const OUTPUT_NODE_TYPES = new Set([
-  'SaveImage', 'VHS_SaveVideo', 'VHS_VideoCombine', 'SaveVideoWebm', 'PreviewImage',
+  'SaveImage', 'SaveVideo', 'VHS_SaveVideo', 'VHS_VideoCombine', 'SaveVideoWebm', 'PreviewImage',
 ]);
 
 /** 跳过的节点类型 */
@@ -560,12 +562,10 @@ function scanNode(node: any, links: any[], allParams: WorkflowParam[], context: 
       const val = widgetsValues[i];
       if (val === null || val === undefined) continue;
       
-      // 用已知映射获取 widget 名称
+      // 只暴露已知的真实字段名；未知 widget 不再兜底成 widget_*
       const knownNames = Object.keys(widgetMap);
-      const widgetName = knownNames.find(k => widgetMap[k] === i) || `widget_${i}`;
-      
-      // 检查是否是已知节点类型的 widget，如果是则直接暴露（不检查连接）
-      if (widgetName in widgetMap) {
+      const widgetName = knownNames.find(k => widgetMap[k] === i);
+      if (widgetName) {
         const inferredType = inferTypeFromValue(val);
         allParams.push(attachContext({
           id: `${nodeId}.${widgetName}`,
@@ -579,35 +579,7 @@ function scanNode(node: any, links: any[], allParams: WorkflowParam[], context: 
           nodeType,
           seedMode: getDefaultSeedMode(nodeType, widgetName, generateLabel(widgetName, nodeType)),
         }, context, nodeDisabled));
-        continue;
       }
-
-      // 对于未知节点，检查是否已连接（仅当 widget index 对应实际 input slot 时）
-      // 注意：不要用 widget index 直接查 inputs，因为 inputs 和 widgets 索引不一定对齐
-      // 只跳过已知的连接类型 widget（如 clip、model 等）
-      const inputAtSlot = getInputBySlotIndex(node, i);
-      if (inputAtSlot?.link !== undefined && inputAtSlot?.link !== null) {
-        const inputType = (inputAtSlot.type || '').toUpperCase();
-        // 只有 MODEL/CLIP/VAE/LATENT 等连接类型才跳过
-        if (['MODEL', 'CLIP', 'VAE', 'LATENT', 'CONDITIONING', 'MASK', 'IMAGE'].includes(inputType)) {
-          continue;
-        }
-      }
-
-      // 暴露用户可配置的 widget
-      const inferredType = inferTypeFromValue(val);
-      allParams.push(attachContext({
-        id: `${nodeId}.${widgetName}`,
-        nodeId: nodeId.toString(),
-        type: inferredType,
-        default: val,
-        label: generateLabel(widgetName, nodeType),
-        visible: true,
-        widgetName: widgetName,
-        nodeTitle,
-        nodeType,
-        seedMode: getDefaultSeedMode(nodeType, widgetName, generateLabel(widgetName, nodeType)),
-      }, context, nodeDisabled));
     }
   }
 
@@ -651,6 +623,7 @@ function scanAPINodes(nodes: Record<string, any>, allParams: WorkflowParam[]): v
       if (Array.isArray(value) && value.length === 2) continue;
 
       const paramType = inferApiInputType(classType, inputName, value);
+      const isAlwaysVisible = classType === 'LoadAudio' || OUTPUT_NODE_TYPES.has(classType);
 
         allParams.push({
           id: `${nodeId}.${inputName}`,
@@ -660,7 +633,7 @@ function scanAPINodes(nodes: Record<string, any>, allParams: WorkflowParam[]): v
           type: paramType,
           default: value,
           label: generateLabel(inputName, classType),
-          visible: false,
+          visible: isAlwaysVisible || false,
           active: !nodeDisabled,
           disabled: nodeDisabled,
           widgetName: inputName,
@@ -753,7 +726,6 @@ export function parseWorkflowParamsV2(workflow: any): WorkflowParam[] {
  */
 export async function parseWorkflowParamsAsyncV2(workflow: any): Promise<WorkflowParam[]> {
   if (!workflow) return [];
-
   if (isApiWorkflow(workflow)) {
     const params: WorkflowParam[] = [];
     const objectInfo = await fetchObjectInfo();

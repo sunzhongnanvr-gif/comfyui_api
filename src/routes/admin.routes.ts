@@ -952,7 +952,7 @@ router.get('/workflows/:filename/preview', async (req: AuthRequest, res: Respons
     const workflow = await client.getWorkflow(filename);
 
     // 自动解析节点，生成建议的参数映射
-    const suggestedParams = parseWorkflowParams(workflow);
+    const suggestedParams = await parseWorkflowParamsAsync(workflow);
 
     // 提取模型依赖
     const isApiFormat = !workflow.nodes;
@@ -1065,7 +1065,7 @@ router.post('/workflows/parse-json', async (req: AuthRequest, res: Response) => 
       : [];
 
     // 🔍 解析工作流可配置参数
-    const parsedParams = parseWorkflowParams(workflow);
+    const parsedParams = await parseWorkflowParamsAsync(workflow);
 
     res.json({
       success: true,
@@ -1127,7 +1127,7 @@ router.post('/workflows/import-manual', async (req: AuthRequest, res: Response) 
     let finalParams = parameters;
     if (!finalParams || (Array.isArray(finalParams) && finalParams.length === 0)) {
       // 如果前端没传参数配置，自动解析
-      const parsedParams = parseWorkflowParams(parsedContent);
+      const parsedParams = await parseWorkflowParamsAsync(parsedContent);
       finalParams = parsedParams;
       console.log(`🔍 自动解析工作流参数：${parsedParams.length} 个`);
     }
@@ -1187,7 +1187,7 @@ router.post('/workflows/import-manual', async (req: AuthRequest, res: Response) 
       data: {
         ...JSON.parse(JSON.stringify(workflow)),
         dependencies,
-        parsedParams: parseWorkflowParams(parsedContent),
+        parsedParams: await parseWorkflowParamsAsync(parsedContent),
       }
     });
   } catch (error: any) {
@@ -1278,7 +1278,7 @@ router.post('/workflows/import', async (req: AuthRequest, res: Response) => {
     // 🔍 自动解析工作流参数
     let finalParams = parameters;
     if (!finalParams || (Array.isArray(finalParams) && finalParams.length === 0)) {
-      const parsedParams = parseWorkflowParams(workflowContent);
+      const parsedParams = await parseWorkflowParamsAsync(workflowContent);
       finalParams = parsedParams;
       console.log(`🔍 自动解析工作流参数：${parsedParams.length} 个`);
     }
@@ -1311,7 +1311,7 @@ router.post('/workflows/import', async (req: AuthRequest, res: Response) => {
       data: {
         ...JSON.parse(JSON.stringify(workflow)),
         dependencies,
-        parsedParams: parseWorkflowParams(workflowContent),
+        parsedParams: await parseWorkflowParamsAsync(workflowContent),
       }
     });
   } catch (error: any) {
