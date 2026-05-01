@@ -28,6 +28,36 @@ async function loadWorkflowFieldConfig(workflowId: string): Promise<any | null> 
   }
 }
 
+function mergeEditableParamState(parsedParams: any[], savedParamsRaw: any): any[] {
+  const savedParams = Array.isArray(savedParamsRaw) ? savedParamsRaw : [];
+  if (savedParams.length === 0) return parsedParams;
+
+  const savedMap = new Map<string, any>();
+  for (const cfg of savedParams) {
+    const id = String(cfg?.id || '').trim();
+    if (!id) continue;
+    savedMap.set(id, cfg);
+  }
+
+  return parsedParams.map((param: any) => {
+    const id = String(param?.id || '').trim();
+    const saved = savedMap.get(id);
+    if (!saved) return param;
+
+    const merged = { ...param };
+    if (Object.prototype.hasOwnProperty.call(saved, 'visible') && saved.visible !== undefined) {
+      merged.visible = saved.visible;
+    }
+    if (Object.prototype.hasOwnProperty.call(saved, 'active') && saved.active !== undefined) {
+      merged.active = saved.active;
+    }
+    if (Object.prototype.hasOwnProperty.call(saved, 'seedMode') && saved.seedMode !== undefined) {
+      merged.seedMode = saved.seedMode;
+    }
+    return merged;
+  });
+}
+
 // ==================== 模型依赖检测 ====================
 
 // ComfyUI 节点类型 → 模型目录映射
@@ -1170,7 +1200,7 @@ router.post('/workflows/import-manual', async (req: AuthRequest, res: Response) 
         apiTemplate,
         isApiFormat,
         parameters: typeof finalParams === 'string' ? finalParams : JSON.stringify(finalParams || []),
-        creditCost: creditCost || 10,
+        creditCost: creditCost ?? 10,
         timeout: timeout || null,
         enabled: true,
         accessConfig: JSON.stringify({
@@ -1294,7 +1324,7 @@ router.post('/workflows/import', async (req: AuthRequest, res: Response) => {
         apiTemplate,
         isApiFormat,
         parameters: typeof finalParams === 'string' ? finalParams : JSON.stringify(finalParams || []),
-        creditCost: creditCost || 10,
+        creditCost: creditCost ?? 10,
         timeout: timeout || null,
         enabled: true,
         accessConfig: JSON.stringify({
@@ -1329,11 +1359,13 @@ router.get('/workflows/:id/params', async (req: AuthRequest, res: Response) => {
     const { id } = req.params;
     const workflow = await prisma.workflow.findUnique({ where: { id } });
     if (!workflow) return res.status(404).json({ success: false, error: '工作流不存在' });
-    const params = await WorkflowParamService.resolveParams(workflow);
+    const template = JSON.parse(workflow.template);
+    const parsedParams = await parseWorkflowParamsAsync(template);
+    const savedParams = workflow.parameters ? JSON.parse(workflow.parameters) : [];
     const fieldConfig = await loadWorkflowFieldConfig(id);
-    const fromDb = Boolean(workflow.parameters);
+    const mergedParams = mergeEditableParamState(parsedParams, savedParams);
 
-    res.json({ success: true, data: { params, fromDb, fieldConfig } });
+    res.json({ success: true, data: { params: mergedParams, fieldConfig } });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }

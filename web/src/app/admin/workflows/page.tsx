@@ -453,7 +453,7 @@ function ComfyUIImportSection(props: {
       <Table dataSource={serverWorkflows} columns={columns} rowKey="filename" loading={loading} pagination={{ pageSize: 10 }} style={{ marginTop: 16 }} />
 
       <Drawer title="导入工作流" placement="right" size="large" open={importDrawerOpen} onClose={() => { setImportDrawerOpen(false); importForm.resetFields(); setShowCustomType(false); }}>
-        <Form form={importForm} layout="vertical" onFinish={handleImport}>
+        <Form form={importForm} layout="vertical" initialValues={{ creditCost: 10 }} onFinish={handleImport}>
           <Form.Item name="filename" label="文件名" rules={[{ required: true }]}><Input disabled /></Form.Item>
           <Form.Item name="name" label="工作流名称" rules={[{ required: true }]}><Input placeholder="例如：文生图-SDXL" /></Form.Item>
           <Form.Item name="type" label="类型" rules={[{ required: true, validator: typeValidator }]}>
@@ -474,7 +474,7 @@ function ComfyUIImportSection(props: {
             </Form.Item>
           )}
           <Form.Item name="description" label="描述"><TextArea rows={3} placeholder="工作流描述" /></Form.Item>
-          <Form.Item name="creditCost" label="积分消耗" rules={[{ required: true }]}><InputNumber min={1} defaultValue={10} style={{ width: '100%' }} /></Form.Item>
+          <Form.Item name="creditCost" label="积分消耗" rules={[{ required: true }]}><InputNumber min={1} style={{ width: '100%' }} /></Form.Item>
           <Form.Item><Button type="primary" htmlType="submit" block>确认导入</Button></Form.Item>
         </Form>
       </Drawer>
@@ -724,7 +724,7 @@ function ManualImportSection(props: {
       {/* 导入表单 */}
       {parsedData && !imported && (
         <Card title="✏️ 填写工作流信息" size="small">
-          <Form form={manualForm} layout="vertical" onFinish={handleImport}>
+          <Form form={manualForm} layout="vertical" initialValues={{ creditCost: 10 }} onFinish={handleImport}>
             <Form.Item name="name" label="工作流名称" rules={[{ required: true }]}>
               <Input placeholder="例如：文生图-SDXL" />
             </Form.Item>
@@ -746,7 +746,7 @@ function ManualImportSection(props: {
               </Form.Item>
             )}
             <Form.Item name="description" label="描述"><TextArea rows={3} placeholder="工作流描述" /></Form.Item>
-            <Form.Item name="creditCost" label="积分消耗" rules={[{ required: true }]}><InputNumber min={1} defaultValue={10} style={{ width: '100%' }} /></Form.Item>
+            <Form.Item name="creditCost" label="积分消耗" rules={[{ required: true }]}><InputNumber min={1} style={{ width: '100%' }} /></Form.Item>
             <Form.Item>
               <Button type="primary" htmlType="submit" block loading={importing}>
                 🚀 确认导入
@@ -2248,7 +2248,8 @@ function GroupedParamEditor({
       <div style={{ maxHeight: 500, overflow: 'auto' }}>
         <Collapse defaultActiveKey={groupedParams.map(group => group.key)} bordered={false}>
           {groupedParams.map((group) => {
-            const childGroups = groupParamsByChildNode(group.items);
+            const { childItems } = splitShellAndChildParams(group.items, group.nodeId);
+            const childGroups = groupParamsByChildNode(childItems);
             const childMode = !!childModeGroups[group.key];
             return (
               <Collapse.Panel

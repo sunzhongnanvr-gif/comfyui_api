@@ -209,9 +209,9 @@ function inferShellInputType(inputName: string, inputDef: any): string {
 }
 
 function getShellInputDefs(subgraph: any, shellNode: any): any[] {
+  if (Array.isArray(subgraph?.inputs)) return subgraph.inputs;
   const shellInputs = Array.isArray(shellNode?.inputs) ? shellNode.inputs : [];
   if (shellInputs.length > 0) return shellInputs;
-  if (Array.isArray(subgraph?.inputs)) return subgraph.inputs;
   return [];
 }
 
@@ -231,6 +231,75 @@ function getShellInputDefault(inputDef: any): any {
   if (inputDef.defaultValue !== undefined) return inputDef.defaultValue;
   if (inputDef.value !== undefined) return inputDef.value;
   if (inputDef.initialValue !== undefined) return inputDef.initialValue;
+  return undefined;
+}
+
+function getWidgetIndexForInput(node: any, targetSlot: number): number | null {
+  if (!node || !Array.isArray(node.inputs)) return null;
+  let widgetIndex = 0;
+  for (let slot = 0; slot < node.inputs.length; slot++) {
+    const input = node.inputs[slot];
+    if (!input || !input.widget) continue;
+    if (slot === targetSlot) return widgetIndex;
+    widgetIndex++;
+  }
+  return null;
+}
+
+function resolveShellInputDefaultFromLinks(linksSource: any[], subgraph: any, shellNode: any, inputDef: any): any {
+  const linkIds = [
+    inputDef?.link,
+    ...(Array.isArray(inputDef?.linkIds) ? inputDef.linkIds : []),
+  ].filter((v) => v !== null && v !== undefined && v !== '');
+  if (linkIds.length === 0) return undefined;
+
+  const links = [
+    ...(Array.isArray(subgraph?.links) ? subgraph.links : []),
+    ...(Array.isArray(linksSource) ? linksSource : []),
+  ];
+  const nodes = Array.isArray(subgraph?.nodes) ? subgraph.nodes : [];
+
+  for (const linkId of linkIds) {
+    const normalizeLink = (item: any) => {
+      if (!item) return null;
+      if (Array.isArray(item)) {
+        return {
+          id: item[0],
+          origin_id: item[1],
+          origin_slot: item[2],
+          target_id: item[3],
+          target_slot: item[4],
+          type: item[5],
+        };
+      }
+      return item;
+    };
+
+    const link = links.find((item: any) => {
+      const normalized = normalizeLink(item);
+      return !!normalized && Number(normalized.id) === Number(linkId);
+    });
+    if (!link) continue;
+    const normalizedLink = normalizeLink(link);
+    if (!normalizedLink) continue;
+
+    const targetNode = nodes.find((node: any) => Number(node?.id) === Number(normalizedLink.target_id));
+    if (!targetNode) continue;
+
+    const targetSlot = Number(normalizedLink.target_slot);
+    if (!Number.isFinite(targetSlot)) continue;
+
+    const widgetIndex = getWidgetIndexForInput(targetNode, targetSlot);
+    if (widgetIndex === null) continue;
+
+    const targetInput = Array.isArray(targetNode.inputs)
+      ? targetNode.inputs.find((inp: any, idx: number) => idx === targetSlot || inp?.slot_index === targetSlot)
+      : null;
+    const widgetName = String(targetInput?.widget?.name || targetInput?.name || '').trim() || undefined;
+    const value = getWidgetValue(targetNode.widgets_values, widgetIndex, widgetName);
+    if (value !== undefined && value !== null) return value;
+  }
+
   return undefined;
 }
 
@@ -258,7 +327,7 @@ function addShellInputParams(subgraph: any, shellNode: any, params: WorkflowPara
     const paramId = `${shellNodeId}.${inputName}`;
     if (params.some(p => p.id === paramId)) continue;
 
-    const defaultValue = getShellInputDefault(inputDef);
+    const defaultValue = getShellInputDefault(inputDef) ?? resolveShellInputDefaultFromLinks(context.links || [], subgraph, shellNode, inputDef);
     params.push({
       id: paramId,
       nodeId: shellNodeId,
@@ -451,6 +520,7 @@ type ScanContext = {
   parentNodeId?: string;
   parentNodeTitle?: string;
   disabled?: boolean;
+  links?: any[];
 };
 
 function attachContext(param: WorkflowParam, context: ScanContext, forceDisabled = false): WorkflowParam {
@@ -475,6 +545,7 @@ function scanNode(node: any, links: any[], allParams: WorkflowParam[], context: 
   const widgetsValues = node.widgets_values || [];
   const nodeTitle = getNodeTitle(node, nodeType);
   const nodeDisabled = context.disabled === true || isBypassedNode(node);
+  const emittedWidgets = new Set<string>();
 
   // 跳过特殊节点
   if (MODEL_LOADER_TYPES.has(nodeType)) return;
@@ -496,6 +567,7 @@ function scanNode(node: any, links: any[], allParams: WorkflowParam[], context: 
         nodeTitle,
         nodeType,
       }, context, nodeDisabled));
+    emittedWidgets.add('image');
     return; // LoadImage 只暴露 image，其他 widget 不需要
   }
 
@@ -513,6 +585,7 @@ function scanNode(node: any, links: any[], allParams: WorkflowParam[], context: 
         nodeTitle,
         nodeType,
       }, context, nodeDisabled));
+    emittedWidgets.add('text');
     return;
   }
   const clipFluxL = getWidgetValue(widgetsValues, 0, 'clip_l');
@@ -530,6 +603,7 @@ function scanNode(node: any, links: any[], allParams: WorkflowParam[], context: 
         nodeTitle,
         nodeType,
       }, context, nodeDisabled));
+    emittedWidgets.add('clip_l');
     allParams.push(attachContext({
       id: `${nodeId}.clip_g`,
       nodeId: nodeId.toString(),
@@ -541,6 +615,7 @@ function scanNode(node: any, links: any[], allParams: WorkflowParam[], context: 
       nodeTitle,
       nodeType,
     }, context, nodeDisabled));
+    emittedWidgets.add('clip_g');
     allParams.push(attachContext({
       id: `${nodeId}.guidance`,
       nodeId: nodeId.toString(),
@@ -552,6 +627,7 @@ function scanNode(node: any, links: any[], allParams: WorkflowParam[], context: 
       nodeTitle,
       nodeType,
     }, context, nodeDisabled));
+    emittedWidgets.add('guidance_scale');
     return;
   }
 
@@ -579,7 +655,35 @@ function scanNode(node: any, links: any[], allParams: WorkflowParam[], context: 
           nodeType,
           seedMode: getDefaultSeedMode(nodeType, widgetName, generateLabel(widgetName, nodeType)),
         }, context, nodeDisabled));
+        emittedWidgets.add(widgetName);
       }
+    }
+  }
+
+  // 对于没有静态映射但确实存在 widget 输入的节点，直接按真实输入名暴露。
+  // 这一步只处理带 widget 的输入，纯 link 节点不会被扫出来。
+  if (Array.isArray(node.inputs) && node.inputs.some((inp: any) => inp && inp.widget)) {
+    let widgetIndex = 0;
+    for (const inputDef of node.inputs) {
+      if (!inputDef || !inputDef.widget) continue;
+      const widgetName = String(inputDef.widget?.name || inputDef.name || '').trim();
+      const currentIndex = widgetIndex++;
+      if (!widgetName || emittedWidgets.has(widgetName)) continue;
+      const value = getWidgetValue(widgetsValues, currentIndex, widgetName);
+      const inferredType = normalizeObjectInfoType(String(inputDef.type || inferTypeFromValue(value) || 'STRING'));
+      allParams.push(attachContext({
+        id: `${nodeId}.${widgetName}`,
+        nodeId: nodeId.toString(),
+        type: inferredType,
+        default: value,
+        label: generateLabel(widgetName, nodeType),
+        visible: true,
+        widgetName,
+        nodeTitle,
+        nodeType,
+        seedMode: getDefaultSeedMode(nodeType, widgetName, generateLabel(widgetName, nodeType)),
+      }, context, nodeDisabled));
+      emittedWidgets.add(widgetName);
     }
   }
 
@@ -700,6 +804,7 @@ export function parseWorkflowParamsV2(workflow: any): WorkflowParam[] {
         parentNodeId: String(shellNode.id),
         parentNodeTitle: shellTitle || getNodeTitle(shellNode, shellNode.type),
         disabled: shellDisabled,
+        links,
       });
     }
 
