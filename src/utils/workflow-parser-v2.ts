@@ -297,7 +297,18 @@ function resolveShellInputDefaultFromLinks(linksSource: any[], subgraph: any, sh
       : null;
     const widgetName = String(targetInput?.widget?.name || targetInput?.name || '').trim() || undefined;
     const value = getWidgetValue(targetNode.widgets_values, widgetIndex, widgetName);
-    if (value !== undefined && value !== null) return value;
+    if (value !== undefined && value !== null) {
+      if (
+        widgetName === 'steps' &&
+        (String(targetNode?.type || '') === 'KSampler' || String(targetNode?.type || '') === 'KSamplerAdvanced') &&
+        typeof value === 'string' &&
+        /^(randomize|fixed)$/i.test(value)
+      ) {
+        const corrected = getWidgetValue(targetNode.widgets_values, widgetIndex + 1, widgetName);
+        if (corrected !== undefined && corrected !== null) return corrected;
+      }
+      return value;
+    }
   }
 
   return undefined;

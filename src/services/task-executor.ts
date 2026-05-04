@@ -645,10 +645,14 @@ export class TaskExecutor {
     const resolvedParameters: Record<string, any> = { ...parameters };
     const workflowParams = task.workflow?.parameters ? JSON.parse(task.workflow.parameters) : [];
     const cleanupUserDataFiles = new Set<string>();
+    const nodeFileCache = new Map<string, string>();
 
     const resolveUploadedFile = async (value: any): Promise<string | null> => {
       if (value === undefined || value === null || value === '') return null;
       const raw = String(value);
+      if (nodeFileCache.has(raw)) {
+        return nodeFileCache.get(raw) || null;
+      }
       const file = await prisma.uploadedFile.findFirst({
         where: {
           userId: task.userId,
@@ -661,8 +665,9 @@ export class TaskExecutor {
         },
       });
       if (!file) return null;
-      const comfyuiFilename = (file as any).comfyuiFilename || await FileUploadService.syncRegisteredFileToComfyUI(file as any, node.url);
+      const comfyuiFilename = await FileUploadService.syncRegisteredFileToComfyUI(file as any, node.url);
       if (comfyuiFilename) {
+        nodeFileCache.set(raw, comfyuiFilename);
         cleanupUserDataFiles.add(comfyuiFilename);
       }
       return comfyuiFilename || null;
@@ -946,16 +951,16 @@ export class TaskExecutor {
       const paramName = String(def?.widgetName || (defId.includes('.') ? defId.split('.').slice(1).join('.') : defId));
       if (!nodeId || !paramName) continue;
 
-      // 种子随机模式：由服务端补一个合法随机 seed，避免依赖 ComfyUI 的特殊值语义
-      if (paramName === 'seed' && def?.seedMode === 'random') {
+      // 种子随机模式：由服务端补一个合法随机值，避免依赖 ComfyUI 的特殊值语义
+      if (def?.seedMode === 'random' && this.isSeedLikeParam(def)) {
         const randomSeed = Math.floor(Math.random() * 1000000000);
         const targets = this.resolveWorkflowNodeIds(apiWorkflow, nodeId);
         for (const targetId of targets) {
           const node = apiWorkflow[targetId];
           if (!node || !node.inputs) continue;
-          node.inputs.seed = randomSeed;
+          node.inputs[paramName] = randomSeed;
         }
-        console.log(`🎲 随机种子模式，注入随机 seed: ${randomSeed} @ ${nodeId}`);
+        console.log(`🎲 随机种子模式，注入随机值: ${randomSeed} @ ${nodeId}.${paramName}`);
         continue;
       }
 
@@ -988,6 +993,20 @@ export class TaskExecutor {
     const ids = Object.keys(apiWorkflow).filter(id => id === nodeId || id.endsWith(`:${nodeId}`));
     if (ids.length > 0) return ids;
     return [];
+  }
+
+  private isSeedLikeParam(def: { id?: string; label?: string; widgetName?: string; nodeType?: string }): boolean {
+    const id = String(def?.id || '').toLowerCase();
+    const label = String(def?.label || '').toLowerCase();
+    const widgetName = String(def?.widgetName || '').toLowerCase();
+    const nodeType = String(def?.nodeType || '').toLowerCase();
+    return id.includes('seed') ||
+      label.includes('seed') ||
+      label.includes('随机种子') ||
+      widgetName.includes('seed') ||
+      widgetName.includes('noise_seed') ||
+      widgetName === 'noise' ||
+      nodeType === 'randomnoise';
   }
 
   /**

@@ -54,6 +54,9 @@ function mergeEditableParamState(parsedParams: any[], savedParamsRaw: any): any[
     if (Object.prototype.hasOwnProperty.call(saved, 'seedMode') && saved.seedMode !== undefined) {
       merged.seedMode = saved.seedMode;
     }
+    if (Object.prototype.hasOwnProperty.call(saved, 'label') && saved.label !== undefined) {
+      merged.label = saved.label;
+    }
     return merged;
   });
 }
@@ -1926,6 +1929,14 @@ router.post('/workflows/:id/test', async (req: AuthRequest, res: Response) => {
           }
         }
       }
+    }
+
+    // 测试模式下也要和正式提交保持一致：seedMode=random 的 seed-like 参数必须重抽
+    for (const param of visibleParams) {
+      if (param.active === false || param.seedMode !== 'random') continue;
+      if (!String(param.id).toLowerCase().includes('seed')) continue;
+      const flatKey = `${param.nodeId}.inputs.${param.widgetName}`;
+      convertedParams[flatKey] = Math.floor(Math.random() * 1000000000);
     }
 
     // 创建 Task 记录（status: queued，TaskExecutor 会自动捞起来执行）

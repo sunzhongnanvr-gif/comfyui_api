@@ -99,14 +99,9 @@ export class FileUploadService {
       filename: string;
       mimeType: string;
       storagePath: string;
-      comfyuiFilename?: string | null;
     },
     comfyuiUrl: string,
   ): Promise<string> {
-    if (uploadedFile.comfyuiFilename) {
-      return uploadedFile.comfyuiFilename;
-    }
-
     const storageRoot = await getStorageRootPath();
     const filePath = path.join(storageRoot, uploadedFile.storagePath);
     if (!fs.existsSync(filePath)) {
@@ -125,13 +120,6 @@ export class FileUploadService {
       timeout: 60000,
     });
 
-    const comfyuiFilename = response.data.name || uploadedFile.filename;
-
-    await prisma.uploadedFile.update({
-      where: { id: uploadedFile.id },
-      data: { comfyuiFilename },
-    });
-
-    return comfyuiFilename;
+    return response.data.name || uploadedFile.filename;
   }
 }
