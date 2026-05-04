@@ -117,7 +117,7 @@ function inferTypeFromValue(value: any): string {
     // 检查是否是文件名
     if (value.match(/\.(png|jpg|jpeg|webp|gif|bmp)$/i)) return 'IMAGE';
     if (value.match(/\.(mp4|webm|mov|avi|mkv)$/i)) return 'VIDEO';
-    if (value.match(/\.(mp3|wav|ogg|flac)$/i)) return 'AUDIO';
+    if (value.match(/\.(mp3|wav|ogg|flac|m4a|m4b|aac|opus)$/i)) return 'AUDIO';
     if (value.match(/\.(safetensors|pt|pth|bin|ckpt)$/i)) return 'COMBO'; // 模型选择
     return 'STRING';
   }
@@ -176,7 +176,7 @@ function inferApiInputType(classType: string, inputName: string, value: any): st
   if (typeof value === 'string') {
     if (value.match(/\.(png|jpg|jpeg|webp|gif|bmp)$/i)) return 'IMAGE';
     if (value.match(/\.(mp4|webm|mov|avi|mkv)$/i)) return 'VIDEO';
-    if (value.match(/\.(mp3|wav|ogg|flac)$/i)) return 'AUDIO';
+    if (value.match(/\.(mp3|wav|ogg|flac|m4a|m4b|aac|opus)$/i)) return 'AUDIO';
   }
 
   return inferTypeFromValue(value);
@@ -642,7 +642,10 @@ function scanNode(node: any, links: any[], allParams: WorkflowParam[], context: 
       const knownNames = Object.keys(widgetMap);
       const widgetName = knownNames.find(k => widgetMap[k] === i);
       if (widgetName) {
-        const inferredType = inferTypeFromValue(val);
+        const inferredType =
+          nodeType === 'LoadAudio' && widgetName === 'audio' ? 'AUDIO' :
+          nodeType === 'LoadVideo' && widgetName === 'video' ? 'VIDEO' :
+          inferTypeFromValue(val);
         allParams.push(attachContext({
           id: `${nodeId}.${widgetName}`,
           nodeId: nodeId.toString(),
