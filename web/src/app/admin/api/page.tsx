@@ -10,7 +10,7 @@ import {
   ApiOutlined, PlayCircleOutlined, InfoCircleOutlined,
   ThunderboltOutlined, CheckCircleOutlined, UploadOutlined, DeleteOutlined
 } from '@ant-design/icons';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, getApiBase } from '@/lib/api';
 
 const { Text, Title } = Typography;
 const { TextArea } = Input;
@@ -99,7 +99,7 @@ export default function ApiManagementPage() {
 
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-      const base = typeof window !== 'undefined' ? `http://${window.location.hostname}:3001/api/v1` : 'http://localhost:3001/api/v1';
+      const base = getApiBase();
 
       const res = await fetch(`${base}/upload/input`, {
         method: 'POST',

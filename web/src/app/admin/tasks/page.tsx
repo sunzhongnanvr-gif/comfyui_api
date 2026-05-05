@@ -10,7 +10,7 @@ import {
   ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined,
   SyncOutlined, PauseCircleOutlined
 } from '@ant-design/icons';
-import { apiFetch, getApiBase } from '@/lib/api';
+import { apiFetch, getApiBase, getApiUrl } from '@/lib/api';
 
 const { Text } = Typography;
 
@@ -506,7 +506,7 @@ export default function TasksPage() {
                 <div style={{ marginTop: 8 }}>
                   {selectedTask.resultUrls.map((url: string, i: number) => (
                     <div key={i}>
-                      <a href={`http://${window.location.hostname}:3001${url}`} target="_blank" rel="noopener noreferrer">
+                      <a href={getApiUrl(url)} target="_blank" rel="noopener noreferrer">
                         📎 {url.split('/').pop()}
                       </a>
                     </div>

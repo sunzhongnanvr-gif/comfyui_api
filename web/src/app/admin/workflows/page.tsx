@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Table, Button, Form, Input, InputNumber, Select, Switch, message, Tag, Space, Popconfirm, Card, Drawer, Descriptions, Typography, Divider, Alert, List, Spin, Upload, Image, Modal, Checkbox, Tabs, Collapse, AutoComplete } from 'antd';
 import { PlusOutlined, SyncOutlined, EyeOutlined, DeleteOutlined, ThunderboltOutlined, CheckCircleOutlined, FileSearchOutlined, PlayCircleOutlined, UploadOutlined, DownloadOutlined, KeyOutlined } from '@ant-design/icons';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, getApiBase } from '@/lib/api';
 
 const { TextArea } = Input;
 const { Text } = Typography;
@@ -1192,7 +1192,7 @@ export default function WorkflowsPage() {
 
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-      const base = typeof window !== 'undefined' ? `http://${window.location.hostname}:3001/api/v1` : 'http://localhost:3001/api/v1';
+      const base = getApiBase();
 
       const res = await fetch(`${base}/upload/input`, {
         method: 'POST',
@@ -1984,7 +1984,7 @@ function GroupedParamEditor({
               try {
                 const formData = new FormData();
                 formData.append('file', file);
-                const base = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.1.100:3001/api/v1';
+                const base = getApiBase();
                 const token = localStorage.getItem('token');
                 const res = await fetch(`${base}/upload/input`, {
                   method: 'POST',

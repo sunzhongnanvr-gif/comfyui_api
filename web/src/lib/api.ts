@@ -1,11 +1,15 @@
 // 动态获取 API 地址
 export function getApiBase(): string {
-  if (typeof window !== 'undefined') {
-    // 浏览器端：优先使用环境变量，否则动态获取
-    return process.env.NEXT_PUBLIC_API_URL || `http://${window.location.hostname}:3001/api/v1`;
+  return process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+}
+
+export function getApiUrl(path: string): string {
+  const base = getApiBase();
+  if (/^https?:\/\//i.test(base)) {
+    return new URL(path, base.endsWith('/') ? base : `${base}/`).toString();
   }
-  // 服务端：优先使用环境变量，否则回退
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+  const normalizedBase = base.endsWith('/') ? base.slice(0, -1) : base;
+  return `${normalizedBase}${path}`;
 }
 
 // API 请求封装
