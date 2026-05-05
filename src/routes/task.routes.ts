@@ -5,7 +5,6 @@ import { upload } from '../middleware/upload';
 import { WorkflowParamService } from '../services/workflow-param-service';
 import { WorkflowManifestService } from '../services/workflow-manifest-service';
 import { TaskResourceService } from '../services/task-resource-service';
-import { parseWorkflowParams, mergeParamsWithConfig } from '../utils/workflow-parser';
 import { deriveLiveTaskProgress, deriveQueuePositionHint } from '../utils/task-progress';
 
 const router = Router();
@@ -144,15 +143,8 @@ router.post('/:workflowSlug', authenticate as any, upload.any() as any, async (r
       });
     }
 
-    // 提取 prompt
-    const prompt = WorkflowParamService.extractPromptText(submittedParams, visibleParams);
-    const promptField = WorkflowParamService.findPromptField(submittedParams, visibleParams);
-
     // 构建扁平参数
     const flatParams = WorkflowParamService.buildTaskParameters(submittedParams, visibleParams, allUploadedFiles);
-    if (promptField) {
-      delete flatParams[WorkflowParamService.paramIdToFlatKey(promptField.id)];
-    }
 
     // 提取参考图片 ID（兼容旧逻辑）
     const referenceImgId = WorkflowParamService.extractReferenceImage(submittedParams, visibleParams, allUploadedFiles)
@@ -187,7 +179,7 @@ router.post('/:workflowSlug', authenticate as any, upload.any() as any, async (r
         userId: user.id,
         workflowId: workflow.id,
         status: 'queued',
-        prompt: prompt || `任务 ${workflow.name}`,
+        prompt: `任务 ${workflow.name}`,
         parameters: Object.keys(flatParams).length > 0 ? JSON.stringify(flatParams) : null,
         referenceImgId,
         creditCost: isTestMode ? 0 : workflow.creditCost,

@@ -1874,13 +1874,11 @@ router.post('/workflows/:id/test', async (req: AuthRequest, res: Response) => {
     if (!workflow) return res.status(404).json({ success: false, error: '工作流不存在' });
 
     const visibleParams = await WorkflowParamService.getVisibleParams(workflow, true);
-    const promptText = WorkflowParamService.extractPromptText(parameters || {}, visibleParams);
 
     // === 异步模式：创建 Task 记录，由 TaskExecutor 自动调度 ===
 
     // 将参数转换为 executor 期望的格式: "nodeId.inputs.paramName": value
     const convertedParams: Record<string, any> = {};
-    let firstText: string | null = promptText || null;
 
     if (parameters && typeof parameters === 'object') {
       for (const [nodeId, params] of Object.entries(parameters)) {
@@ -1888,29 +1886,8 @@ router.post('/workflows/:id/test', async (req: AuthRequest, res: Response) => {
           for (const [paramName, value] of Object.entries(params)) {
             const paramId = `${nodeId}.${paramName}`;
             const paramDef = visibleParams.find(p => p.id === paramId);
-            if (paramDef?.active === false) continue;
+            if (!paramDef || paramDef.active === false) continue;
             const flatKey = `${nodeId}.inputs.${paramName}`;
-            // 提取主提示词参数作为 prompt
-            const promptParam = visibleParams.find(p =>
-              p.id === paramId &&
-              p.active !== false &&
-              (
-                p.label.toLowerCase().includes('提示词') ||
-                p.label.toLowerCase().includes('prompt') ||
-                String(p.nodeTitle || '').toLowerCase().includes('prompt') ||
-                String(p.nodeType || '').toLowerCase().includes('prompt') ||
-                p.id.endsWith('.text') ||
-                p.id.endsWith('.prompt') ||
-                paramName === 'text' ||
-                paramName === 'prompt'
-              )
-            );
-
-            if (promptParam && typeof value === 'string' && !firstText) {
-              firstText = value;
-              continue;
-            }
-
             convertedParams[flatKey] = value;
           }
         }
@@ -1923,20 +1900,12 @@ router.post('/workflows/:id/test', async (req: AuthRequest, res: Response) => {
         if (typeof params === 'object' && params !== null) {
           for (const [paramName, filename] of Object.entries(params)) {
             const paramDef = visibleParams.find(p => p.id === `${nodeId}.${paramName}`);
-            if (paramDef?.active === false) continue;
+            if (!paramDef || paramDef.active === false) continue;
             const flatKey = `${nodeId}.inputs.${paramName}`;
             convertedParams[flatKey] = filename;
           }
         }
       }
-    }
-
-    // 测试模式下也要和正式提交保持一致：seedMode=random 的 seed-like 参数必须重抽
-    for (const param of visibleParams) {
-      if (param.active === false || param.seedMode !== 'random') continue;
-      if (!String(param.id).toLowerCase().includes('seed')) continue;
-      const flatKey = `${param.nodeId}.inputs.${param.widgetName}`;
-      convertedParams[flatKey] = Math.floor(Math.random() * 1000000000);
     }
 
     // 创建 Task 记录（status: queued，TaskExecutor 会自动捞起来执行）
@@ -1946,7 +1915,7 @@ router.post('/workflows/:id/test', async (req: AuthRequest, res: Response) => {
         userId: req.user!.id,
         workflowId: id,
         status: 'queued',
-        prompt: firstText || `测试: ${workflow.name}`,
+        prompt: `测试: ${workflow.name}`,
         parameters: Object.keys(convertedParams).length > 0 ? JSON.stringify(convertedParams) : null,
         creditCost: 0, // 测试任务不扣积分
       }

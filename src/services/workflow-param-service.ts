@@ -458,52 +458,7 @@ export class WorkflowParamService {
       result[flatKey] = value;
     }
 
-    // 补充默认值（用户未传的参数）
-    for (const param of visibleParams) {
-      if (param.active === false) continue;
-      const flatKey = this.paramIdToFlatKey(param.id);
-      if (result[flatKey] === undefined && param.default !== undefined && param.default !== null) {
-        result[flatKey] = param.default;
-      }
-    }
-
-    // 种子处理：seedMode=随机 时由服务端补一个合法整数
-    for (const param of visibleParams) {
-      if (param.active === false) continue;
-      if (param.seedMode !== 'random') continue;
-      const flatKey = this.paramIdToFlatKey(param.id);
-      if (String(param.id).toLowerCase().includes('seed')) {
-        result[flatKey] = Math.floor(Math.random() * 1000000000);
-      }
-    }
-
     return result;
-  }
-
-  /**
-   * 找出主提示词字段，供 task.prompt 使用并从 flat 参数中剥离。
-   */
-  static findPromptField(
-    submitted: Record<string, any>,
-    visibleParams: WorkflowParamConfig[],
-  ): { id: string; value: string } | null {
-    for (const param of visibleParams) {
-      if (param.active === false) continue;
-      const label = (param.label || '').toLowerCase();
-      const nodeTitle = String(param.nodeTitle || '').toLowerCase();
-      const nodeType = String(param.nodeType || '').toLowerCase();
-      const widgetName = (param.id.split('.').slice(1).join('.') || '').toLowerCase();
-      const value = this.getSubmittedValue(submitted, param.id, widgetName);
-
-      if ((param.type === 'STRING' || param.type === 'TEXT') &&
-          (label.includes('提示词') || label.includes('prompt') || nodeTitle.includes('prompt') || nodeType.includes('prompt') || widgetName === 'text' || widgetName === 'prompt' || param.id.endsWith('.text') || param.id.endsWith('.prompt'))) {
-        if (typeof value === 'string' && value.trim()) {
-          return { id: param.id, value: value.trim() };
-        }
-      }
-    }
-
-    return null;
   }
 
   /**
@@ -549,16 +504,6 @@ export class WorkflowParamService {
   private static normalizeSurface(surface: any): 'user' | 'setting' | 'both' | 'system' {
     if (surface === 'user' || surface === 'setting' || surface === 'both' || surface === 'system') return surface;
     return 'setting';
-  }
-
-  /**
-   * 从参数中提取主提示词（用于 prompt 字段）
-   */
-  static extractPromptText(
-    submitted: Record<string, any>,
-    visibleParams: WorkflowParamConfig[],
-  ): string {
-    return this.findPromptField(submitted, visibleParams)?.value || '';
   }
 
   /**

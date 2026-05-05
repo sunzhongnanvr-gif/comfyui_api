@@ -512,7 +512,7 @@ export class TaskExecutor {
       // 构建外部输入解析表：子图输入节点 → 壳节点外部输入 → 顶层节点
       // 壳节点的 inputs 中有 linkIds，链接到顶层节点
       const externalInputResolve = new Map<number, [string, number]>();
-      for (const shellInp of (shellNode.inputs || [])) {
+      (shellNode.inputs || []).forEach((shellInp: any, shellInputIndex: number) => {
         const shellLinkIds = (shellInp as any).linkIds || [];
         for (const linkId of shellLinkIds) {
           const linkInfo = subgraphLinkMap[linkId];
@@ -543,14 +543,15 @@ export class TaskExecutor {
               if (!sLinkInfo) continue;
               // 检查这个顶层链接是否对应到同一个壳节点输入
               // sLinkInfo = [originId, originSlot, targetId(shellNode.id), targetSlot, type]
-              if (sLinkInfo[2] === shellNode.id && sLinkInfo[3] === shellInp.slot_index) {
+              const shellTargetSlot = (shellInp as any).slot_index ?? shellInputIndex;
+              if (sLinkInfo[2] === shellNode.id && sLinkInfo[3] === shellTargetSlot) {
                 externalInputResolve.set(internalNodeId, [String(sLinkInfo[0]), sLinkInfo[1]]);
                 break;
               }
             }
           }
         }
-      }
+      });
 
       // 子图外部输出映射：按 slot_index 索引
       // 每个 slot_index 对应一个内部节点的 [nodeId, slot]
@@ -707,7 +708,6 @@ export class TaskExecutor {
 
   private async buildWorkflow(task: any, node: ComfyUINode): Promise<any> {
     const { parameters, referenceComfyuiFilename } = await this.resolveTaskFilesForNode(task, node);
-    const promptParamIds = this.getPromptParamIds(task.workflow);
 
     const comfyuiImageFile = referenceComfyuiFilename;
     if (comfyuiImageFile) {
@@ -716,96 +716,49 @@ export class TaskExecutor {
       console.warn('⚠️ 任务关联了参考图，但未找到 ComfyUI 文件名');
     }
 
-    // 优先使用预转换的 API 格式工作流
-    if (task.workflow.apiTemplate) {
-      console.log('✅ 使用预转换的 API 格式工作流');
-      const apiWorkflow = JSON.parse(task.workflow.apiTemplate);
+    const template = JSON.parse(task.workflow.template || '{}');
 
-      this.applyWorkflowParameters(apiWorkflow, task.workflow, parameters, task.prompt);
-
-      // 注入扁平格式的任意参数（格式： "nodeId.paramName": value，兼容旧的 nodeId.inputs.paramName）
-      // 测试接口使用此格式传递参数
-      const flatParamCount = this.injectFlatParameters(apiWorkflow, parameters);
-      if (flatParamCount > 0) {
-        console.log(`🧪 注入扁平格式参数 ${flatParamCount} 个`);
-      }
-
-      // 兜底：把主提示词再写回一次，避免被历史默认值或 flat 参数覆盖
-      this.injectPromptText(apiWorkflow, task.prompt, promptParamIds);
-
-      // 图生图：替换 EmptyLatentImage 为 LoadImage + VAEEncode
-      if (comfyuiImageFile) {
-        this.injectImageToImageNodes(apiWorkflow, comfyuiImageFile);
-      }
-
-      // 🔧 规范化 combo widget 值
-      return await this.normalizeComboValues(apiWorkflow);
-    }
-
-    // 回退到动态转换
-    console.log('⚠️ 无预转换 API 格式，使用动态转换');
-    const template = JSON.parse(task.workflow.template);
-
+    // UI 格式：优先使用 ComfyUI 官方转换结果，避免本地转换遗漏 prompt 连线
     if (template.nodes) {
-      // 先尝试使用 ComfyUI 官方转换接口，和手动“转换为 api”保持一致
+      console.log('⚠️ UI 工作流，优先使用 ComfyUI 官方转换结果');
       const comfyConverted = await this.convertUIWorkflowViaComfyUI(task.workflow);
       if (comfyConverted) {
-        this.applyWorkflowParameters(comfyConverted, task.workflow, parameters, task.prompt);
+        await this.restoreMissingLinkInputs(comfyConverted, task.workflow);
+        this.applyWorkflowParameters(comfyConverted, task.workflow, parameters);
         console.log(`🔍 ComfyUI API 转换完成，共 ${Object.keys(comfyConverted).length} 个节点`);
 
-        // 图生图：替换 EmptyLatentImage 为 LoadImage + VAEEncode
         if (comfyuiImageFile) {
           this.injectImageToImageNodes(comfyConverted, comfyuiImageFile);
         }
 
-        // 兜底：把主提示词写回对应节点，防止转换链路里的默认值覆盖
-        this.injectPromptText(comfyConverted, task.prompt, promptParamIds);
-
         return await this.normalizeComboValues(comfyConverted);
       }
 
-      // UI 格式：替换参数后转为 API 格式（本地兜底）
+      console.warn('⚠️ 官方转换失败，回退本地 UI→API 转换');
       const wf = JSON.parse(JSON.stringify(template));
       const converted = await this.convertUIToAPI(wf);
-      this.applyWorkflowParameters(converted, task.workflow, parameters, task.prompt);
-      console.log(`🔍 UI→API 转换完成，共 ${Object.keys(converted).length} 个节点`);
-      // 打印完整转换结果用于调试
-      for (const [nid, node] of Object.entries(converted)) {
-        const n = node as any;
-        console.log(`  ${nid}: ${n.class_type}`);
-        for (const [k, v] of Object.entries(n.inputs || {})) {
-          const valStr = typeof v === 'string' ? v.slice(0, 60) : JSON.stringify(v);
-          console.log(`    ${k}: ${valStr}`);
-        }
-      }
+      await this.restoreMissingLinkInputs(converted, task.workflow);
+      this.applyWorkflowParameters(converted, task.workflow, parameters);
 
-      // 图生图：替换 EmptyLatentImage 为 LoadImage + VAEEncode
       if (comfyuiImageFile) {
         this.injectImageToImageNodes(converted, comfyuiImageFile);
       }
 
-      // 兜底：把主提示词写回对应节点，防止转换链路里的默认值覆盖
-      this.injectPromptText(converted, task.prompt, promptParamIds);
-
-      // 🔧 规范化 combo widget 值
       return await this.normalizeComboValues(converted);
-    } else {
-      // API 格式：直接处理
-      const wf = JSON.parse(JSON.stringify(template));
-      if (task.workflow.parameters) {
-        this.applyWorkflowParameters(wf, task.workflow, parameters, task.prompt);
-      }
-
-      // 图生图：替换 EmptyLatentImage 为 LoadImage + VAEEncode
-      if (comfyuiImageFile) {
-        this.injectImageToImageNodes(wf, comfyuiImageFile);
-      }
-
-      this.injectPromptText(wf, task.prompt, promptParamIds);
-
-      // 🔧 规范化 combo widget 值
-      return await this.normalizeComboValues(wf);
     }
+
+    // API 格式：直接处理缓存模板
+    console.log('✅ 使用 API 格式工作流模板');
+    const wf = JSON.parse(JSON.stringify(task.workflow.apiTemplate || template));
+    if (task.workflow.parameters) {
+      this.applyWorkflowParameters(wf, task.workflow, parameters);
+    }
+
+    if (comfyuiImageFile) {
+      this.injectImageToImageNodes(wf, comfyuiImageFile);
+    }
+
+    return await this.normalizeComboValues(wf);
   }
 
   private buildRemoteCleanupCandidates(value: string): string[] {
@@ -879,35 +832,6 @@ export class TaskExecutor {
     }
   }
 
-  /**
-   * 从工作流参数定义中识别主提示词字段。
-   */
-  private getPromptParamIds(workflow: any): string[] {
-    if (!workflow?.parameters) return [];
-
-    let defs: any[] = [];
-    try {
-      defs = typeof workflow.parameters === 'string' ? JSON.parse(workflow.parameters) : workflow.parameters;
-    } catch {
-      return [];
-    }
-
-    if (!Array.isArray(defs)) return [];
-
-    return defs
-      .filter(def => {
-        if (def?.active === false) return false;
-        const label = String(def?.label || '').toLowerCase();
-        const nodeTitle = String(def?.nodeTitle || '').toLowerCase();
-        const type = String(def?.type || '').toUpperCase();
-        const id = String(def?.id || '');
-        return (type === 'STRING' || type === 'TEXT') &&
-          (label.includes('提示词') || label.includes('prompt') || nodeTitle.includes('prompt') || id.endsWith('.text') || id.endsWith('.prompt'));
-      })
-      .map(def => String(def.id))
-      .filter(Boolean);
-  }
-
   private isTemporaryUploadValue(value: any): boolean {
     return typeof value === 'string' && /^temp_upload_/i.test(value.trim());
   }
@@ -933,7 +857,11 @@ export class TaskExecutor {
     return undefined;
   }
 
-  private applyWorkflowParameters(apiWorkflow: Record<string, any>, workflow: any, parameters: Record<string, any>, prompt: string): void {
+  private applyWorkflowParameters(
+    apiWorkflow: Record<string, any>,
+    workflow: any,
+    parameters: Record<string, any>,
+  ): void {
     if (!workflow?.parameters) return;
 
     let defs: any[] = [];
@@ -944,6 +872,9 @@ export class TaskExecutor {
     }
 
     if (!Array.isArray(defs)) return;
+    // 同一个 API 目标可能先被 shell 输入命中，再被内部默认值再次扫描到。
+    // 这里记录写入来源，保证“客户端显式值”永远不被后续默认值覆盖。
+    const writtenTargets = new Map<string, 'submitted' | 'default' | 'random'>();
 
     for (const def of defs) {
       const defId = String(def?.id || def?.key || '');
@@ -954,11 +885,13 @@ export class TaskExecutor {
       // 种子随机模式：由服务端补一个合法随机值，避免依赖 ComfyUI 的特殊值语义
       if (def?.seedMode === 'random' && this.isSeedLikeParam(def)) {
         const randomSeed = Math.floor(Math.random() * 1000000000);
-        const targets = this.resolveWorkflowNodeIds(apiWorkflow, nodeId);
+        const targets = this.resolveWorkflowNodeIds(apiWorkflow, workflow, nodeId, paramName, def, def?.default);
         for (const targetId of targets) {
           const node = apiWorkflow[targetId];
           if (!node || !node.inputs) continue;
+          const targetKey = `${targetId}.${paramName}`;
           node.inputs[paramName] = randomSeed;
+          writtenTargets.set(targetKey, 'random');
         }
         console.log(`🎲 随机种子模式，注入随机值: ${randomSeed} @ ${nodeId}.${paramName}`);
         continue;
@@ -967,6 +900,7 @@ export class TaskExecutor {
       if (def?.active === false) continue;
 
       let value = this.getTaskParameter(parameters, nodeId, paramName);
+      const hasSubmittedValue = value !== undefined;
       if (value === undefined) {
         if (['IMAGE', 'VIDEO', 'AUDIO'].includes(String(def?.type || '').toUpperCase()) && this.isTemporaryUploadValue(def?.default)) {
           value = undefined;
@@ -974,25 +908,179 @@ export class TaskExecutor {
           value = def?.default;
         }
       }
-      if (value === undefined && (paramName === 'text' || defId.endsWith('.text') || String(def?.label || '').toLowerCase().includes('prompt'))) {
-        value = prompt;
-      }
       if (value === undefined) continue;
 
-      const targets = this.resolveWorkflowNodeIds(apiWorkflow, nodeId);
+      const targets = this.resolveWorkflowNodeIds(apiWorkflow, workflow, nodeId, paramName, def, value);
       for (const targetId of targets) {
+        const targetKey = `${targetId}.${paramName}`;
+        const currentValue = apiWorkflow[targetId]?.inputs?.[paramName];
+        if (!hasSubmittedValue && this.isLinkInputValue(currentValue)) {
+          continue;
+        }
+        if (value !== undefined && writtenTargets.has(targetKey) && writtenTargets.get(targetKey) !== 'default') {
+          continue;
+        }
         const node = apiWorkflow[targetId];
         if (!node || !node.inputs) continue;
         node.inputs[paramName] = value;
+        writtenTargets.set(targetKey, value === def?.default ? 'default' : 'submitted');
       }
     }
 
   }
 
-  private resolveWorkflowNodeIds(apiWorkflow: Record<string, any>, nodeId: string): string[] {
-    const ids = Object.keys(apiWorkflow).filter(id => id === nodeId || id.endsWith(`:${nodeId}`));
-    if (ids.length > 0) return ids;
-    return [];
+  private resolveWorkflowNodeIds(
+    apiWorkflow: Record<string, any>,
+    workflow: any,
+    nodeId: string,
+    paramName?: string,
+    def?: any,
+    value?: any,
+  ): string[] {
+    const ids = new Set<string>(Object.keys(apiWorkflow).filter(id => id === nodeId || id.endsWith(`:${nodeId}`)));
+    if (ids.size > 0) return Array.from(ids);
+
+    const proxyTargets = this.resolveShellProxyTargets(workflow, apiWorkflow, nodeId, paramName, def, value);
+    for (const target of proxyTargets) {
+      if (apiWorkflow[target]) ids.add(target);
+    }
+    return Array.from(ids);
+  }
+
+  private isLinkInputValue(value: any): boolean {
+    return Array.isArray(value) &&
+      value.length === 2 &&
+      (typeof value[0] === 'string' || typeof value[0] === 'number') &&
+      (typeof value[1] === 'number' || value[1] === 0);
+  }
+
+  private shouldRestoreInputValue(currentValue: any, sourceValue: any): boolean {
+    if (!this.isLinkInputValue(sourceValue)) return false;
+    if (currentValue === undefined || currentValue === null || currentValue === '') return true;
+    if (Array.isArray(currentValue)) return false;
+    return typeof currentValue !== 'object';
+  }
+
+  private async restoreMissingLinkInputs(apiWorkflow: Record<string, any>, workflow: any): Promise<void> {
+    if (!workflow?.template) return;
+
+    let template: any;
+    try {
+      template = typeof workflow.template === 'string' ? JSON.parse(workflow.template) : workflow.template;
+    } catch {
+      return;
+    }
+
+    if (!template?.nodes) return;
+
+    try {
+      const sourceWorkflow = await this.convertUIWorkflowViaComfyUI(workflow)
+        || await this.convertUIToAPI(JSON.parse(JSON.stringify(template)));
+      for (const [nodeId, sourceNode] of Object.entries(sourceWorkflow || {})) {
+        const targetNode = apiWorkflow[nodeId];
+        if (!targetNode) continue;
+        if (!sourceNode || typeof sourceNode !== 'object') continue;
+        const sourceInputs = (sourceNode as any).inputs;
+        const targetInputs = (targetNode as any).inputs;
+        if (!sourceInputs || !targetInputs) continue;
+
+        for (const [inputName, sourceValue] of Object.entries(sourceInputs)) {
+          const currentValue = targetInputs[inputName];
+          if (!this.shouldRestoreInputValue(currentValue, sourceValue)) continue;
+          targetInputs[inputName] = Array.isArray(sourceValue)
+            ? [...sourceValue]
+            : (typeof sourceValue === 'object' && sourceValue !== null ? JSON.parse(JSON.stringify(sourceValue)) : sourceValue);
+        }
+      }
+    } catch (error: any) {
+      console.warn(`⚠️ 复原 API 工作流连线失败: ${error?.message || error}`);
+    }
+  }
+
+  private resolveShellProxyTargets(
+    workflow: any,
+    apiWorkflow: Record<string, any>,
+    nodeId: string,
+    paramName?: string,
+    def?: any,
+    value?: any,
+  ): string[] {
+    if (!workflow?.template || !paramName) return [];
+
+    let template: any;
+    try {
+      template = typeof workflow.template === 'string' ? JSON.parse(workflow.template) : workflow.template;
+    } catch {
+      return [];
+    }
+
+    const nodes = Array.isArray(template?.nodes) ? template.nodes : [];
+    const shellNode = nodes.find((node: any) => String(node?.id) === String(nodeId));
+    const proxyWidgets = shellNode?.properties?.proxyWidgets;
+    if (!Array.isArray(proxyWidgets)) return [];
+
+    const candidates: Array<{ targetId: string; score: number }> = [];
+    const wantedLabel = this.normalizeMatchText(def?.label || paramName);
+    const wantedValue = def?.default;
+    const valueType = this.getValueType(value !== undefined ? value : wantedValue);
+
+    for (const entry of proxyWidgets) {
+      if (!Array.isArray(entry) || entry.length < 2) continue;
+      const [internalId, widgetName] = entry;
+      const internal = String(internalId ?? '').trim();
+      if (!internal || internal === '-1') continue;
+      const targetId = `${nodeId}:${internal}`;
+      const targetNode = apiWorkflow[targetId];
+      if (!targetNode || !targetNode.inputs) continue;
+
+      const targetWidgetName = String(widgetName || '').trim();
+      const nodeTitle = this.normalizeMatchText(targetNode?._meta?.title || targetNode?.title || targetNode?.properties?.['Node name for S&R'] || '');
+      const inputValue = this.readNodeWidgetValue(targetNode, targetWidgetName);
+      const inputType = this.getValueType(inputValue);
+      let score = 0;
+
+      if (String(targetWidgetName) === String(paramName)) score += 100;
+      if (wantedLabel) {
+        if (nodeTitle === wantedLabel) score += 80;
+        else if (nodeTitle.includes(wantedLabel) || wantedLabel.includes(nodeTitle)) score += 50;
+      }
+      if (wantedValue !== undefined && inputValue === wantedValue) score += 40;
+      if (valueType && inputType && valueType === inputType) score += 20;
+      if (wantedLabel && this.normalizeMatchText(targetWidgetName) === wantedLabel) score += 10;
+
+    candidates.push({ targetId, score });
+  }
+
+  if (candidates.length === 0) return [];
+  candidates.sort((a, b) => b.score - a.score || a.targetId.localeCompare(b.targetId));
+  const bestScore = candidates[0].score;
+  if (bestScore <= 0) return [];
+  // 保留所有并列最优目标：ComfyUI 的 proxyWidgets 允许一个外部字段同时映射到多个内部节点。
+  // 只排除明显低匹配项，避免把合法多目标映射静默吞掉。
+  return candidates.filter(c => c.score === bestScore).map(c => c.targetId);
+  }
+
+  private normalizeMatchText(value: any): string {
+    return String(value ?? '')
+      .toLowerCase()
+      .replace(/[\s_-]+/g, '')
+      .replace(/[()（）【】\[\]{}]/g, '')
+      .trim();
+  }
+
+  private getValueType(value: any): 'string' | 'number' | 'boolean' | 'array' | 'object' | 'null' | 'undefined' {
+    if (value === null) return 'null';
+    if (Array.isArray(value)) return 'array';
+    return typeof value as any;
+  }
+
+  private readNodeWidgetValue(node: any, widgetName: string): any {
+    if (!node?.inputs || !widgetName) return undefined;
+    if (Object.prototype.hasOwnProperty.call(node.inputs, widgetName)) {
+      return node.inputs[widgetName];
+    }
+    const inputs = Object.values(node.inputs);
+    return inputs.length === 1 ? inputs[0] : undefined;
   }
 
   private isSeedLikeParam(def: { id?: string; label?: string; widgetName?: string; nodeType?: string }): boolean {
@@ -1007,95 +1095,6 @@ export class TaskExecutor {
       widgetName.includes('noise_seed') ||
       widgetName === 'noise' ||
       nodeType === 'randomnoise';
-  }
-
-  /**
-   * 将主提示词写回工作流，避免被默认值覆盖。
-   */
-  private injectPromptText(apiWorkflow: Record<string, any>, prompt: string, promptParamIds: string[]): void {
-    if (!prompt) return;
-
-    const ids = promptParamIds.length > 0
-      ? promptParamIds
-      : Object.entries(apiWorkflow)
-          .filter(([, node]: any) => node?.class_type === 'CLIPTextEncode' && node?.inputs?.text !== undefined)
-          .map(([nodeId]) => `${nodeId}.text`);
-
-    const targetNodeIds = new Set<string>();
-
-    for (const paramId of ids) {
-      const match = paramId.match(/^(.+?)\.(?:inputs\.)?([^\.]+)$/);
-      if (!match) continue;
-
-      const [, nodeId, paramName] = match;
-
-      const exactNode = apiWorkflow[nodeId];
-
-      if (paramName === 'value') {
-        if (exactNode?.inputs) {
-          exactNode.inputs.value = prompt;
-          targetNodeIds.add(nodeId);
-        }
-      }
-
-      if (paramName === 'text') {
-        if (exactNode?.inputs) {
-          exactNode.inputs.text = prompt;
-          targetNodeIds.add(nodeId);
-        }
-      }
-
-      if (paramName === 'prompt') {
-        if (exactNode?.inputs) {
-          exactNode.inputs.prompt = prompt;
-          targetNodeIds.add(nodeId);
-        }
-      }
-
-      // 子图工作流在 API 阶段通常会变成 "shellId:internalId" 形式，
-      // 例如 "57:27"。这里补一次后缀匹配，避免只按内部 id 命中失败。
-      for (const [apiNodeId, node] of Object.entries(apiWorkflow) as [string, any][]) {
-        if (apiNodeId === nodeId || !node?.inputs || !node?.class_type) continue;
-        if (!apiNodeId.endsWith(`:${nodeId}`)) continue;
-        if (node.inputs.value !== undefined) {
-          node.inputs.value = prompt;
-          targetNodeIds.add(apiNodeId);
-        }
-        if (node.inputs.text !== undefined) {
-          node.inputs.text = prompt;
-          targetNodeIds.add(apiNodeId);
-        }
-        if (node.inputs.prompt !== undefined) {
-          node.inputs.prompt = prompt;
-          targetNodeIds.add(apiNodeId);
-        }
-      }
-    }
-
-    // 最后再兜底一次：如果前面的参数 id 没有命中，仍然把所有可写的 prompt/text 写回去。
-    if (targetNodeIds.size === 0) {
-      for (const [nodeId, node] of Object.entries(apiWorkflow) as [string, any][]) {
-        if (!node?.inputs) continue;
-        if (node.inputs.value !== undefined) {
-          node.inputs.value = prompt;
-          targetNodeIds.add(nodeId);
-        }
-        if (node.inputs.text !== undefined) {
-          node.inputs.text = prompt;
-          targetNodeIds.add(nodeId);
-        }
-        if (node.inputs.prompt !== undefined) {
-          node.inputs.prompt = prompt;
-          targetNodeIds.add(nodeId);
-        }
-      }
-    }
-
-    if (targetNodeIds.size > 0) {
-      console.log(`📝 prompt 注入到节点: ${Array.from(targetNodeIds).join(', ')} -> "${prompt}"`);
-    } else {
-      console.warn('⚠️ 未找到可注入 prompt 的 CLIPTextEncode 节点');
-    }
   }
 
   /**
