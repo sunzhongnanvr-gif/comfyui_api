@@ -48,6 +48,38 @@ function normalizeTask(task: any) {
   };
 }
 
+function formatDuration(seconds: number) {
+  const total = Math.max(0, Math.floor(seconds || 0));
+  if (total < 60) return `${total} 秒`;
+  const minutes = Math.floor(total / 60);
+  const remain = total % 60;
+  if (minutes < 60) return `${minutes} 分 ${remain} 秒`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hours} 小时 ${mins} 分 ${remain} 秒`;
+}
+
+function getTaskDurationText(task: any) {
+  if (!task?.createdAt) return '-';
+  const createdAt = new Date(task.createdAt).getTime();
+  if (Number.isNaN(createdAt)) return '-';
+
+  const finishedAt = task.updatedAt ? new Date(task.updatedAt).getTime() : null;
+  if (task.status === 'completed' || task.status === 'failed') {
+    if (finishedAt && !Number.isNaN(finishedAt) && finishedAt >= createdAt) {
+      return formatDuration((finishedAt - createdAt) / 1000);
+    }
+    return '-';
+  }
+
+  if (task.status === 'processing') {
+    const runningTo = finishedAt && !Number.isNaN(finishedAt) ? finishedAt : Date.now();
+    return formatDuration((runningTo - createdAt) / 1000);
+  }
+
+  return '-';
+}
+
 export default function TasksPage() {
   const [loading, setLoading] = useState(false);
   const [tasks, setTasks] = useState<any[]>([]);
@@ -292,7 +324,7 @@ export default function TasksPage() {
       render: (progress: number, record: any) => {
         const createdAt = new Date(record.createdAt).getTime();
         const updatedAt = new Date(record.updatedAt || record.createdAt).getTime();
-        const runningSeconds = Math.max(0, Math.floor((Date.now() - updatedAt) / 1000));
+        const runningSeconds = Math.max(0, Math.floor((Date.now() - (Number.isNaN(updatedAt) ? createdAt : updatedAt)) / 1000));
         return (
           <Space direction="vertical" size={0} style={{ width: '100%' }}>
             {record.status === 'processing' ? <Progress percent={progress} size="small" /> :
@@ -444,9 +476,9 @@ export default function TasksPage() {
               <Descriptions.Item label="排队位置">{selectedTask.queue_hint || selectedTask.queue_position ? selectedTask.queue_hint || `第 ${selectedTask.queue_position} 位` : '-'}</Descriptions.Item>
               <Descriptions.Item label="消耗积分">{selectedTask.creditCost}</Descriptions.Item>
               <Descriptions.Item label="创建时间">{new Date(selectedTask.createdAt).toLocaleString('zh-CN')}</Descriptions.Item>
-            <Descriptions.Item label="更新时间">{selectedTask.updatedAt ? new Date(selectedTask.updatedAt).toLocaleString('zh-CN') : '-'}</Descriptions.Item>
-            <Descriptions.Item label="耗时">计算中...</Descriptions.Item>
-          </Descriptions>
+              <Descriptions.Item label="更新时间">{selectedTask.updatedAt ? new Date(selectedTask.updatedAt).toLocaleString('zh-CN') : '-'}</Descriptions.Item>
+              <Descriptions.Item label="耗时">{getTaskDurationText(selectedTask)}</Descriptions.Item>
+            </Descriptions>
 
           <div style={{ marginTop: 16 }}>
             <Button onClick={() => exportTaskDetail(selectedTask)}>导出详情</Button>
