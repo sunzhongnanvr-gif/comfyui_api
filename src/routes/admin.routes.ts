@@ -1388,7 +1388,7 @@ router.put('/workflows/:id/params', async (req: AuthRequest, res: Response) => {
     if (!workflow) return res.status(404).json({ success: false, error: '工作流不存在' });
 
     await prisma.$executeRawUnsafe(
-      'UPDATE "Workflow" SET "parameters" = $1, "fieldConfig" = $2 WHERE "id" = $3',
+      'UPDATE "Workflow" SET "parameters" = $1::jsonb, "fieldConfig" = $2::jsonb WHERE "id" = $3',
       JSON.stringify(parameters),
       JSON.stringify(fieldConfig || { surfaces: {} }),
       id
