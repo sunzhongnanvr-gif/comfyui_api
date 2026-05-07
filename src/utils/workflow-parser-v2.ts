@@ -108,6 +108,27 @@ function getWidgetValue(widgetsValues: any, index: number, widgetName?: string):
   return undefined;
 }
 
+function detectHiddenWidgetOffset(nodeType: string, node: any, widgetsValues: any[]): number {
+  if (!Array.isArray(widgetsValues) || widgetsValues.length < 2) return 0;
+  if (!Array.isArray(node?.inputs)) return 0;
+
+  const widgetNames = node.inputs
+    .filter((inp: any) => inp && inp.widget)
+    .map((inp: any) => String(inp.widget?.name || inp.name || '').trim())
+    .filter(Boolean);
+
+  if (widgetNames.length === 0) return 0;
+  const hasSeedLikeWidget = widgetNames.some((name: string) => isSeedParam(nodeType, name));
+  if (!hasSeedLikeWidget) return 0;
+
+  const hiddenValue = widgetsValues[1];
+  if (widgetsValues.length === widgetNames.length + 1 && typeof hiddenValue === 'string' && /^(fixed|random)$/i.test(hiddenValue)) {
+    return 1;
+  }
+
+  return 0;
+}
+
 /** 从 widget 值推断类型 */
 function inferTypeFromValue(value: any): string {
   if (typeof value === 'number') {
@@ -557,6 +578,7 @@ function scanNode(node: any, links: any[], allParams: WorkflowParam[], context: 
   const nodeTitle = getNodeTitle(node, nodeType);
   const nodeDisabled = context.disabled === true || isBypassedNode(node);
   const emittedWidgets = new Set<string>();
+  const hiddenWidgetOffset = detectHiddenWidgetOffset(nodeType, node, widgetsValues);
 
   // 跳过特殊节点
   if (MODEL_LOADER_TYPES.has(nodeType)) return;
@@ -646,7 +668,8 @@ function scanNode(node: any, links: any[], allParams: WorkflowParam[], context: 
   if (Array.isArray(widgetsValues)) {
     const widgetMap = WIDGET_INDEX_MAP[nodeType] || {};    
     for (let i = 0; i < widgetsValues.length; i++) {
-      const val = widgetsValues[i];
+      const actualIndex = hiddenWidgetOffset > 0 && i >= 1 ? i + hiddenWidgetOffset : i;
+      const val = widgetsValues[actualIndex];
       if (val === null || val === undefined) continue;
       
       // 只暴露已知的真实字段名；未知 widget 不再兜底成 widget_*
@@ -683,7 +706,8 @@ function scanNode(node: any, links: any[], allParams: WorkflowParam[], context: 
       const widgetName = String(inputDef.widget?.name || inputDef.name || '').trim();
       const currentIndex = widgetIndex++;
       if (!widgetName || emittedWidgets.has(widgetName)) continue;
-      const value = getWidgetValue(widgetsValues, currentIndex, widgetName);
+      const valueIndex = hiddenWidgetOffset > 0 && currentIndex >= 1 ? currentIndex + hiddenWidgetOffset : currentIndex;
+      const value = getWidgetValue(widgetsValues, valueIndex, widgetName);
       const inferredType = normalizeObjectInfoType(String(inputDef.type || inferTypeFromValue(value) || 'STRING'));
       allParams.push(attachContext({
         id: `${nodeId}.${widgetName}`,

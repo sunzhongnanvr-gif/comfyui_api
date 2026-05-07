@@ -1029,26 +1029,32 @@ export class TaskExecutor {
       const [internalId, widgetName] = entry;
       const internal = String(internalId ?? '').trim();
       if (!internal || internal === '-1') continue;
-      const targetId = `${nodeId}:${internal}`;
-      const targetNode = apiWorkflow[targetId];
-      if (!targetNode || !targetNode.inputs) continue;
 
       const targetWidgetName = String(widgetName || '').trim();
-      const nodeTitle = this.normalizeMatchText(targetNode?._meta?.title || targetNode?.title || targetNode?.properties?.['Node name for S&R'] || '');
-      const inputValue = this.readNodeWidgetValue(targetNode, targetWidgetName);
-      const inputType = this.getValueType(inputValue);
-      let score = 0;
+      const candidateIds = Object.keys(apiWorkflow).filter(id =>
+        id === `${nodeId}:${internal}` || id.startsWith(`${nodeId}:${internal}:`)
+      );
 
-      if (String(targetWidgetName) === String(paramName)) score += 100;
-      if (wantedLabel) {
-        if (nodeTitle === wantedLabel) score += 80;
-        else if (nodeTitle.includes(wantedLabel) || wantedLabel.includes(nodeTitle)) score += 50;
+      for (const targetId of candidateIds) {
+        const targetNode = apiWorkflow[targetId];
+        if (!targetNode || !targetNode.inputs) continue;
+
+        const nodeTitle = this.normalizeMatchText(targetNode?._meta?.title || targetNode?.title || targetNode?.properties?.['Node name for S&R'] || '');
+        const inputValue = this.readNodeWidgetValue(targetNode, targetWidgetName);
+        const inputType = this.getValueType(inputValue);
+        let score = 0;
+
+        if (String(targetWidgetName) === String(paramName)) score += 100;
+        if (wantedLabel) {
+          if (nodeTitle === wantedLabel) score += 80;
+          else if (nodeTitle.includes(wantedLabel) || wantedLabel.includes(nodeTitle)) score += 50;
+        }
+        if (wantedValue !== undefined && inputValue === wantedValue) score += 40;
+        if (valueType && inputType && valueType === inputType) score += 20;
+        if (wantedLabel && this.normalizeMatchText(targetWidgetName) === wantedLabel) score += 10;
+
+        candidates.push({ targetId, score });
       }
-      if (wantedValue !== undefined && inputValue === wantedValue) score += 40;
-      if (valueType && inputType && valueType === inputType) score += 20;
-      if (wantedLabel && this.normalizeMatchText(targetWidgetName) === wantedLabel) score += 10;
-
-    candidates.push({ targetId, score });
   }
 
   if (candidates.length === 0) return [];
