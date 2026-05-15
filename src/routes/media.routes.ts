@@ -7,6 +7,48 @@ import { hostToContainerPath } from '../utils/storage';
 
 const router = Router();
 
+function getBearerToken(req: AuthRequest): string | null {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.split(' ')[1];
+  }
+
+  const queryToken = req.query.token;
+  if (typeof queryToken === 'string' && queryToken.length > 0) {
+    return queryToken;
+  }
+
+  return null;
+}
+
+function authenticateMediaRequest(req: AuthRequest, res: Response): boolean {
+  try {
+    const token = getBearerToken(req);
+    if (!token) {
+      res.status(401).json({ success: false, error: '未提供认证令牌' });
+      return false;
+    }
+
+    const decoded = require('jsonwebtoken').verify(token, process.env.JWT_SECRET || 'secret') as any;
+    req.user = {
+      id: decoded.id,
+      username: decoded.username,
+      role: decoded.role,
+      group: decoded.group,
+    };
+
+    if (req.user?.role !== 'admin') {
+      res.status(403).json({ success: false, error: '需要管理员权限' });
+      return false;
+    }
+
+    return true;
+  } catch {
+    res.status(401).json({ success: false, error: '认证令牌无效或已过期' });
+    return false;
+  }
+}
+
 // 所有媒体管理路由都需要认证 + 管理员权限
 router.use(authenticate as any);
 router.use((req: AuthRequest, res: Response, next: Function) => {
@@ -78,6 +120,56 @@ router.get('/users', async (req: AuthRequest, res: Response) => {
     res.json({ success: true, data });
   } catch (error: any) {
     console.error('❌ 获取用户存储列表失败:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /admin/media/files/:id/thumbnail
+ * 获取文件缩略图/预览（用于前端展示）
+ */
+router.get('/files/:id/thumbnail', async (req: AuthRequest, res: Response) => {
+  try {
+    if (!authenticateMediaRequest(req, res)) return;
+
+    const { id } = req.params;
+
+    const record = await prisma.mediaOutput.findUnique({ where: { id } });
+    if (!record) {
+      return res.status(404).json({ success: false, error: '文件不存在' });
+    }
+
+    const resolvedPath = path.resolve(record.filePath);
+    const mediaRoot = path.resolve(await getMediaRootAsync());
+
+    if (!resolvedPath.startsWith(mediaRoot)) {
+      return res.status(403).json({ success: false, error: '非法路径' });
+    }
+
+    if (!fs.existsSync(resolvedPath)) {
+      return res.status(404).json({ success: false, error: '物理文件不存在' });
+    }
+
+    // 根据类型设置 Content-Type
+    const ext = path.extname(resolvedPath).toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.mp4': 'video/mp4',
+      '.webm': 'video/webm',
+      '.mp3': 'audio/mpeg',
+      '.wav': 'audio/wav',
+      '.ogg': 'audio/ogg',
+    };
+
+    const contentType = mimeTypes[ext] || 'application/octet-stream';
+    res.setHeader('Content-Type', contentType);
+    res.sendFile(resolvedPath);
+  } catch (error: any) {
+    console.error('❌ 获取文件失败:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -172,49 +264,61 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 /**
- * GET /admin/media/:userId/:id/thumbnail
- * 获取文件缩略图/预览（用于前端展示）
+ * POST /admin/media/batch-delete
+ * 批量删除文件（物理文件 + 数据库记录）
  */
-router.get('/files/:id/thumbnail', async (req: AuthRequest, res: Response) => {
+router.post('/batch-delete', async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    if (!authenticateMediaRequest(req, res)) return;
 
-    const record = await prisma.mediaOutput.findUnique({ where: { id } });
-    if (!record) {
-      return res.status(404).json({ success: false, error: '文件不存在' });
+    const { ids } = req.body as { ids?: string[] };
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, error: 'ids 不能为空' });
     }
 
-    const resolvedPath = path.resolve(record.filePath);
-    const mediaRoot = path.resolve(await getMediaRootAsync());
+    const records = await prisma.mediaOutput.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, filePath: true },
+    });
 
-    if (!resolvedPath.startsWith(mediaRoot)) {
-      return res.status(403).json({ success: false, error: '非法路径' });
+    let deleted = 0;
+    let skipped = 0;
+
+    for (const record of records) {
+      try {
+        if (record.filePath) {
+          const mediaRoot = await getMediaRootAsync();
+          const resolvedPath = path.resolve(record.filePath);
+          const resolvedRoot = path.resolve(mediaRoot);
+
+          if (!resolvedPath.startsWith(resolvedRoot)) {
+            skipped++;
+            continue;
+          }
+
+          if (fs.existsSync(resolvedPath)) {
+            fs.unlinkSync(resolvedPath);
+          }
+        }
+
+        await prisma.mediaOutput.delete({ where: { id: record.id } });
+        deleted++;
+      } catch (error: any) {
+        console.error(`❌ 批量删除单条失败: ${record.id}`, error.message);
+        skipped++;
+      }
     }
 
-    if (!fs.existsSync(resolvedPath)) {
-      return res.status(404).json({ success: false, error: '物理文件不存在' });
-    }
-
-    // 根据类型设置 Content-Type
-    const ext = path.extname(resolvedPath).toLowerCase();
-    const mimeTypes: Record<string, string> = {
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png',
-      '.gif': 'image/gif',
-      '.webp': 'image/webp',
-      '.mp4': 'video/mp4',
-      '.webm': 'video/webm',
-      '.mp3': 'audio/mpeg',
-      '.wav': 'audio/wav',
-      '.ogg': 'audio/ogg',
-    };
-
-    const contentType = mimeTypes[ext] || 'application/octet-stream';
-    res.setHeader('Content-Type', contentType);
-    res.sendFile(resolvedPath);
+    res.json({
+      success: true,
+      data: {
+        deleted,
+        skipped,
+        message: `批量删除完成：成功 ${deleted} 条，跳过 ${skipped} 条`,
+      },
+    });
   } catch (error: any) {
-    console.error('❌ 获取文件失败:', error.message);
+    console.error('❌ 批量删除失败:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });

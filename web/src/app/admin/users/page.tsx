@@ -18,6 +18,8 @@ export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [keyword, setKeyword] = useState('');
+  const [searchText, setSearchText] = useState('');
   
   // Modals
   const [rechargeModal, setRechargeModal] = useState(false);
@@ -38,12 +40,14 @@ export default function UsersPage() {
   const [editForm] = Form.useForm();
   const [passwordForm] = Form.useForm();
 
-  useEffect(() => { loadUsers(); loadLevels(); }, [page]);
+  useEffect(() => { loadUsers(); loadLevels(); }, [page, keyword]);
 
   const loadUsers = async () => {
     setLoading(true);
     try {
-      const data = await apiFetch(`/admin/users?page=${page}&limit=20`);
+      const params = new URLSearchParams({ page: String(page), limit: '20' });
+      if (keyword.trim()) params.set('keyword', keyword.trim());
+      const data = await apiFetch(`/admin/users?${params.toString()}`);
       if (data.success) { setUsers(data.data.users); setTotal(data.data.pagination.total); }
     } catch (error) { message.error('加载用户列表失败'); }
     finally { setLoading(false); }
@@ -134,6 +138,24 @@ export default function UsersPage() {
     } catch (error) { message.error('修改失败'); }
   };
 
+  const handleDelete = async (user: any) => {
+    try {
+      const data = await apiFetch(`/admin/users/${user.id}`, { method: 'DELETE' });
+      if (data.success) {
+        message.success('用户已删除');
+        if (users.length === 1 && page > 1) {
+          setPage(page - 1);
+        } else {
+          loadUsers();
+        }
+      } else {
+        message.error(data.error || '删除失败');
+      }
+    } catch (error: any) {
+      message.error(error.message || '删除失败');
+    }
+  };
+
   const columns = [
     { title: '用户名', dataIndex: 'username', key: 'username', width: 100 },
     { title: '邮箱', dataIndex: 'email', key: 'email', width: 150 },
@@ -172,6 +194,16 @@ export default function UsersPage() {
           <Button size="small" icon={<BarChartOutlined />} onClick={() => loadUserStats(record)}>统计</Button>
           {record.status !== 'active' && <Button size="small" type="primary" icon={<CheckOutlined />} onClick={() => handleEnable(record.id, true)}>启用</Button>}
           {record.status === 'active' && <Button size="small" danger icon={<StopOutlined />} onClick={() => handleEnable(record.id, false)}>禁用</Button>}
+          <Popconfirm
+            title="确认删除用户"
+            description="将同时删除该用户的任务、媒体、上传文件和积分流水，不可恢复。"
+            onConfirm={() => handleDelete(record)}
+            okText="删除"
+            cancelText="取消"
+            okButtonProps={{ danger: true }}
+          >
+            <Button size="small" danger>删除</Button>
+          </Popconfirm>
         </Space>
       ),
     },
@@ -180,6 +212,28 @@ export default function UsersPage() {
   return (
     <div>
       <Card title={`用户管理 (${total} 人)`}>
+        <Space style={{ marginBottom: 16 }} wrap>
+          <Input.Search
+            allowClear
+            placeholder="搜索用户名 / 邮箱 / 姓名 / 手机号"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            onSearch={() => {
+              setPage(1);
+              setKeyword(searchText.trim());
+            }}
+            style={{ width: 320 }}
+          />
+          <Button
+            onClick={() => {
+              setSearchText('');
+              setKeyword('');
+              setPage(1);
+            }}
+          >
+            清空搜索
+          </Button>
+        </Space>
         <Table 
           dataSource={users} columns={columns} rowKey="id" loading={loading} 
           scroll={{ x: 1200 }}

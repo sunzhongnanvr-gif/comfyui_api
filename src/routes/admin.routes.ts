@@ -642,10 +642,19 @@ router.get('/users', async (req: AuthRequest, res: Response) => {
     const page = parseInt(req.query.page as string || '1', 10);
     const limit = parseInt(req.query.limit as string || '20', 10);
     const status = req.query.status as string;
+    const keyword = (req.query.keyword as string || '').trim();
     const skip = (page - 1) * limit;
 
     const where: any = {};
     if (status) where.status = status;
+    if (keyword) {
+      where.OR = [
+        { username: { contains: keyword, mode: 'insensitive' } },
+        { email: { contains: keyword, mode: 'insensitive' } },
+        { realName: { contains: keyword, mode: 'insensitive' } },
+        { phone: { contains: keyword, mode: 'insensitive' } },
+      ];
+    }
 
     const [users, total] = await Promise.all([
       prisma.user.findMany({
@@ -690,6 +699,45 @@ router.get('/users', async (req: AuthRequest, res: Response) => {
     });
   } catch (error) {
     throw error;
+  }
+});
+
+// 删除用户
+router.delete('/users/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const currentUserId = req.user?.id;
+    const currentUsername = req.user?.username;
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, username: true, role: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: '用户不存在' });
+    }
+
+    if (user.role === 'admin') {
+      return res.status(400).json({ success: false, error: '不能删除管理员账号' });
+    }
+
+    if (currentUserId === id || currentUsername === user.username) {
+      return res.status(400).json({ success: false, error: '不能删除当前登录账号' });
+    }
+
+    await prisma.$transaction([
+      prisma.mediaOutput.deleteMany({ where: { userId: id } }),
+      prisma.uploadedFile.deleteMany({ where: { userId: id } }),
+      prisma.creditLog.deleteMany({ where: { userId: id } }),
+      prisma.task.deleteMany({ where: { userId: id } }),
+      prisma.user.delete({ where: { id } }),
+    ]);
+
+    res.json({ success: true, data: { message: '用户已删除' } });
+  } catch (error: any) {
+    console.error('❌ 删除用户失败:', error.message);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

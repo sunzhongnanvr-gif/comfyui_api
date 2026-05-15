@@ -13,14 +13,18 @@ export interface AuthRequest extends Request {
 export const authenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
+    const queryToken = req.query.token;
+    const token = authHeader?.startsWith('Bearer ')
+      ? authHeader.split(' ')[1]
+      : (typeof queryToken === 'string' && queryToken.length > 0 ? queryToken : null);
+
+    if (!token) {
       return res.status(401).json({
         success: false,
         error: '未提供认证令牌'
       });
     }
 
-    const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as any;
 
     req.user = {

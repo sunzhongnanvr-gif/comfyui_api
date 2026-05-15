@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   List, Card, Tabs, Button, Modal, message, Tag, Spin, Typography,
-  Image, Space, Popconfirm, Empty
+  Image, Space, Popconfirm, Empty, Checkbox, Divider
 } from 'antd';
 import {
   DeleteOutlined, PictureOutlined, VideoCameraOutlined,
@@ -12,6 +12,17 @@ import {
 import { apiFetch, getApiBase } from '@/lib/api';
 
 const { Text } = Typography;
+
+function getAuthToken() {
+  if (typeof window === 'undefined') return '';
+  return localStorage.getItem('token') || '';
+}
+
+function buildMediaUrl(id: string) {
+  const token = getAuthToken();
+  const base = `${getApiBase()}/admin/media/files/${id}/thumbnail`;
+  return token ? `${base}?token=${encodeURIComponent(token)}` : base;
+}
 
 // ==================== 工具函数 ====================
 
@@ -108,7 +119,7 @@ function FilePreviewModal({ file, open, onClose }: {
 }) {
   if (!file) return null;
 
-  const fileUrl = `${getApiBase()}/admin/media/files/${file.id}/thumbnail`;
+  const fileUrl = buildMediaUrl(file.id);
 
   return (
     <Modal
@@ -150,11 +161,16 @@ function FilePreviewModal({ file, open, onClose }: {
 
 // ==================== 文件列表（右侧主区域） ====================
 
-function FileList({ files, onDelete, onPreview, loading }: {
+function FileList({ files, onDelete, onPreview, loading, selectedIds, onToggleSelect, onToggleSelectAll, allSelected, indeterminate }: {
   files: any[];
   onDelete: (id: string) => void;
   onPreview: (file: any) => void;
   loading: boolean;
+  selectedIds: string[];
+  onToggleSelect: (id: string, checked: boolean) => void;
+  onToggleSelectAll: (checked: boolean) => void;
+  allSelected: boolean;
+  indeterminate: boolean;
 }) {
   if (loading) {
     return <div style={{ padding: 40, textAlign: 'center' }}><Spin size="large" /></div>;
@@ -165,104 +181,135 @@ function FileList({ files, onDelete, onPreview, loading }: {
   }
 
   return (
-    <List
-      grid={{ gutter: 16, xs: 1, sm: 2, md: 3, lg: 3, xl: 4, xxl: 4 }}
-      dataSource={files}
-      renderItem={(file) => {
-        const fileUrl = `${getApiBase()}/admin/media/files/${file.id}/thumbnail`;
+    <>
+      <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <Checkbox
+          checked={allSelected}
+          indeterminate={indeterminate}
+          onChange={(e) => onToggleSelectAll(e.target.checked)}
+        >
+          全选当前列表
+        </Checkbox>
+        <Text type="secondary">已选中 {selectedIds.length} 个</Text>
+      </div>
+      <List
+        grid={{ gutter: 16, xs: 1, sm: 2, md: 3, lg: 3, xl: 4, xxl: 4 }}
+        dataSource={files}
+        renderItem={(file) => {
+          const fileUrl = buildMediaUrl(file.id);
+          const checked = selectedIds.includes(file.id);
 
-        return (
-          <List.Item>
-            <Card
-              hoverable
-              size="small"
-              cover={
-                <div
-                  style={{
-                    height: 160,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: '#fafafa',
-                    cursor: 'pointer',
-                    overflow: 'hidden',
-                  }}
-                  onClick={() => onPreview(file)}
-                >
-                  {file.type === 'image' ? (
-                    <img
-                      src={fileUrl}
-                      alt={file.fileName}
+          return (
+            <List.Item>
+              <Card
+                hoverable
+                size="small"
+                cover={
+                  <div
+                    style={{
+                      position: 'relative',
+                      height: 160,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: '#fafafa',
+                      cursor: 'pointer',
+                      overflow: 'hidden',
+                    }}
+                    onClick={() => onPreview(file)}
+                  >
+                    <div
                       style={{
-                        maxWidth: '100%',
-                        maxHeight: '100%',
-                        objectFit: 'contain',
+                        position: 'absolute',
+                        top: 8,
+                        left: 8,
+                        zIndex: 2,
+                        background: 'rgba(255,255,255,0.92)',
+                        borderRadius: 6,
+                        padding: '2px 6px',
                       }}
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
-                  ) : file.type === 'video' ? (
-                    <video
-                      src={fileUrl}
-                      style={{ maxWidth: '100%', maxHeight: '100%' }}
-                      preload="metadata"
-                    />
-                  ) : (
-                    <AudioOutlined style={{ fontSize: 48, color: '#faad14' }} />
-                  )}
-                </div>
-              }
-              actions={[
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<PictureOutlined />}
-                  onClick={() => onPreview(file)}
-                >
-                  预览
-                </Button>,
-                <Popconfirm
-                  title="确认删除"
-                  description="删除后将同时删除物理文件和数据库记录，不可恢复"
-                  onConfirm={() => onDelete(file.id)}
-                  okText="删除"
-                  cancelText="取消"
-                  okButtonProps={{ danger: true }}
-                >
-                  <Button type="text" size="small" danger icon={<DeleteOutlined />}>
-                    删除
-                  </Button>
-                </Popconfirm>,
-              ]}
-            >
-              <Card.Meta
-                title={
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {getTypeIcon(file.type)}
-                    <Text ellipsis={{ tooltip: file.fileName }} style={{ maxWidth: 150 }}>
-                      {file.fileName}
-                    </Text>
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onChange={(e) => onToggleSelect(file.id, e.target.checked)}
+                      />
+                    </div>
+                    {file.type === 'image' ? (
+                      <img
+                        src={fileUrl}
+                        alt={file.fileName}
+                        style={{
+                          maxWidth: '100%',
+                          maxHeight: '100%',
+                          objectFit: 'contain',
+                        }}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    ) : file.type === 'video' ? (
+                      <video
+                        src={fileUrl}
+                        style={{ maxWidth: '100%', maxHeight: '100%' }}
+                        preload="metadata"
+                      />
+                    ) : (
+                      <AudioOutlined style={{ fontSize: 48, color: '#faad14' }} />
+                    )}
                   </div>
                 }
-                description={
-                  <div>
-                    <Tag color={getTypeColor(file.type)}>{getTypeLabel(file.type)}</Tag>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      {formatBytes(file.fileSize)}
-                    </Text>
-                    <br />
-                    <Text type="secondary" style={{ fontSize: 11 }}>
-                      {new Date(file.createdAt).toLocaleDateString('zh-CN')}
-                    </Text>
-                  </div>
-                }
-              />
-            </Card>
-          </List.Item>
-        );
-      }}
-    />
+                actions={[
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<PictureOutlined />}
+                    onClick={() => onPreview(file)}
+                  >
+                    预览
+                  </Button>,
+                  <Popconfirm
+                    title="确认删除"
+                    description="删除后将同时删除物理文件和数据库记录，不可恢复"
+                    onConfirm={() => onDelete(file.id)}
+                    okText="删除"
+                    cancelText="取消"
+                    okButtonProps={{ danger: true }}
+                  >
+                    <Button type="text" size="small" danger icon={<DeleteOutlined />}>
+                      删除
+                    </Button>
+                  </Popconfirm>,
+                ]}
+              >
+                <Card.Meta
+                  title={
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {getTypeIcon(file.type)}
+                      <Text ellipsis={{ tooltip: file.fileName }} style={{ maxWidth: 150 }}>
+                        {file.fileName}
+                      </Text>
+                    </div>
+                  }
+                  description={
+                    <div>
+                      <Tag color={getTypeColor(file.type)}>{getTypeLabel(file.type)}</Tag>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {formatBytes(file.fileSize)}
+                      </Text>
+                      <br />
+                      <Text type="secondary" style={{ fontSize: 11 }}>
+                        {new Date(file.createdAt).toLocaleDateString('zh-CN')}
+                      </Text>
+                    </div>
+                  }
+                />
+              </Card>
+            </List.Item>
+          );
+        }}
+      />
+    </>
   );
 }
 
@@ -278,6 +325,8 @@ export default function MediaPage() {
   const [previewFile, setPreviewFile] = useState<any | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
+  const [batchDeleting, setBatchDeleting] = useState(false);
 
   // 加载用户列表
   const loadUsers = useCallback(async () => {
@@ -295,6 +344,7 @@ export default function MediaPage() {
   // 加载文件列表
   const loadFiles = useCallback(async (userId: string, type?: string) => {
     setFilesLoading(true);
+    setSelectedFileIds([]);
     try {
       const url = type && type !== 'all'
         ? `/admin/media/${userId}?type=${type}`
@@ -340,6 +390,55 @@ export default function MediaPage() {
     }
   };
 
+  const handleToggleSelect = (id: string, checked: boolean) => {
+    setSelectedFileIds((prev) => {
+      if (checked) {
+        return prev.includes(id) ? prev : [...prev, id];
+      }
+      return prev.filter((item) => item !== id);
+    });
+  };
+
+  const handleToggleSelectAll = (checked: boolean) => {
+    setSelectedFileIds(checked ? files.map((file) => file.id) : []);
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedFileIds.length === 0) {
+      message.info('请先选择要删除的文件');
+      return;
+    }
+
+    Modal.confirm({
+      title: '确认批量删除',
+      content: `将删除 ${selectedFileIds.length} 个文件，包含物理文件和数据库记录，不可恢复。`,
+      okText: '删除',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      async onOk() {
+        setBatchDeleting(true);
+        try {
+          const data = await apiFetch('/admin/media/batch-delete', {
+            method: 'POST',
+            body: JSON.stringify({ ids: selectedFileIds }),
+          });
+          if (data.success) {
+            message.success(data.data.message || '批量删除成功');
+            setSelectedFileIds([]);
+            if (selectedUserId) {
+              loadFiles(selectedUserId, activeTab);
+              loadUsers();
+            }
+          }
+        } catch (error: any) {
+          message.error('批量删除失败: ' + error.message);
+        } finally {
+          setBatchDeleting(false);
+        }
+      },
+    });
+  };
+
   // 预览文件
   const handlePreview = (file: any) => {
     setPreviewFile(file);
@@ -369,6 +468,9 @@ export default function MediaPage() {
     { key: 'video', label: '🎬 视频', children: null },
     { key: 'sound', label: '🎵 音频', children: null },
   ];
+
+  const allSelected = files.length > 0 && selectedFileIds.length === files.length;
+  const indeterminate = selectedFileIds.length > 0 && selectedFileIds.length < files.length;
 
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 120px)', gap: 16 }}>
@@ -408,9 +510,18 @@ export default function MediaPage() {
         {selectedUserId ? (
           <>
             <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
-              <Space>
+              <Space wrap>
                 <Text strong>文件列表</Text>
                 <Text type="secondary">({files.length} 个文件)</Text>
+                <Divider type="vertical" />
+                <Button
+                  danger
+                  disabled={selectedFileIds.length === 0}
+                  loading={batchDeleting}
+                  onClick={handleBatchDelete}
+                >
+                  批量删除 ({selectedFileIds.length})
+                </Button>
               </Space>
             </div>
             <div style={{ padding: '0 16px' }}>
@@ -427,6 +538,11 @@ export default function MediaPage() {
                 onDelete={handleDelete}
                 onPreview={handlePreview}
                 loading={filesLoading}
+                selectedIds={selectedFileIds}
+                onToggleSelect={handleToggleSelect}
+                onToggleSelectAll={handleToggleSelectAll}
+                allSelected={allSelected}
+                indeterminate={indeterminate}
               />
             </div>
           </>
